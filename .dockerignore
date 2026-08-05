@@ -1,0 +1,30 @@
+# Zubeli — .dockerignore (for the app Dockerfile, which is deferred)
+# Keeps secrets and dev-only artifacts out of any future image build.
+
+# dependencies
+node_modules/
+
+# next.js build output
+.next/
+out/
+build/
+
+# testing
+coverage/
+playwright-report/
+test-results/
+e2e/
+
+# environments / secrets — never bake into an image
+.env
+.env.*
+!.env.example
+
+# misc
+.git
+.gitignore
+*.log
+npm-debug.log*
+.DS_Store
+README.md
+docs/

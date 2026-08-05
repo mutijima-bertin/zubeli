@@ -1,0 +1,61 @@
+# Zubeli — local development infrastructure
+# DevOps scope: PostgreSQL services only. The app Dockerfile is deferred.
+#
+# Port contract (verified 2026-08-05):
+#   5432/5433 -> used by ANOTHER project (css-postgres, css-postgres-test) — do NOT reuse.
+#   5434/5435 -> reserved for zubeli (dev DB + test DB).
+#
+# Usage:
+#   docker compose up -d        # start both databases
+#   docker compose down         # stop (data persists in named volumes)
+#   docker compose down -v      # stop AND delete data (destructive — backup first)
+
+name: zubeli
+
+services:
+  # Primary development database (used by `npm run dev`, migrations, seeding)
+  zubeli-postgres:
+    image: postgres:16-alpine
+    container_name: zubeli-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zubeli
+      POSTGRES_PASSWORD: zubeli
+      POSTGRES_DB: zubeli
+    ports:
+      - "5434:5432"
+    volumes:
+      - zubeli-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready runs inside the container where the postgres binary lives
+      test: ["CMD-SHELL", "pg_isready -U zubeli"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Isolated database for the automated test suite (never point tests at dev data)
+  zubeli-postgres-test:
+    image: postgres:16-alpine
+    container_name: zubeli-postgres-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zubeli
+      POSTGRES_PASSWORD: zubeli
+      POSTGRES_DB: zubeli_test
+    ports:
+      - "5435:5432"
+    volumes:
+      - zubeli-test-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zubeli"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+# Named volumes keep data alive across container restarts/recreations.
+# Backups (devops-agent, later) run against these volume-backed instances.
+volumes:
+  zubeli-pgdata:
+  zubeli-test-pgdata:
