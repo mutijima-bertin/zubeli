@@ -1,0 +1,239 @@
+// Zubeli — data model per ADR 0001 (docs/adr/0001-data-model.md)
+// Classic Prisma workflow: url = env("DATABASE_URL"), client generated into node_modules/@prisma/client.
+// Money rule (global): all money is Int minor units. RWF has no circulating subunit, so 1 minor unit = 1 RWF.
+// Prices are VAT-inclusive; there is no tax line. currency column defaults to "RWF" for future multi-currency.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums (single source of truth — Prisma enums)
+// ---------------------------------------------------------------------------
+
+enum Role {
+  CUSTOMER
+  OWNER
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  CANCELLED
+  REFUNDED
+}
+
+// MOMO_GATEWAY and CARD are reserved for future gateway integrations (ADR 0003):
+// they exist as enum values now so adding a provider later needs no schema change.
+enum PaymentMethod {
+  COD_CASH
+  COD_MOBILE_MONEY
+  BANK_TRANSFER
+  MOMO_GATEWAY // reserved — no provider implements it in the MVP
+  CARD // reserved — no provider implements it in the MVP
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum InventoryMovementType {
+  IN
+  OUT
+}
+
+enum InventoryReason {
+  RESTOCK
+  ORDER
+  ADJUSTMENT
+  RETURN
+  CANCEL
+}
+
+// ---------------------------------------------------------------------------
+// Entities
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique // stored lowercased (enforced at the repository layer)
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role     @default(CUSTOMER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions          Session[] // onDelete: Cascade — sessions are meaningless without the user
+  carts             Cart[] // onDelete: SetNull — cart history survives user deletion
+  orders            Order[] // onDelete: SetNull — order history survives user deletion
+  confirmedPayments Payment[] // onDelete: SetNull — audit survives owner deletion
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  user       User      @relation(onDelete: Cascade, fields: [userId], references: [id])
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  userId     String
+
+  @@index([expiresAt]) // session cleanup queries
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id                String    @id @default(cuid())
+  name              String
+  slug              String    @unique
+  description       String?
+  imageUrls         String[]  @default([]) // hero image = imageUrls[0]; no ProductImage table in MVP (ADR 0001)
+  priceCents        Int
+  currency          String    @default("RWF")
+  stockQty          Int       @default(0)
+  lowStockThreshold Int       @default(5)
+  isPublished       Boolean   @default(false)
+  featured          Boolean   @default(false)
+  category          Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict) // a category with products cannot be deleted — recategorize first
+  categoryId        String
+  deletedAt         DateTime? // soft delete — order history stays intact
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  cartItems  CartItem[]
+  movements  InventoryMovement[]
+  orderItems OrderItem[]
+
+  @@index([categoryId]) // catalog category browse
+}
+
+// Append-only stock ledger. quantity is always positive; direction comes from `type`.
+model InventoryMovement {
+  id        String                @id @default(cuid())
+  product   Product               @relation(fields: [productId], references: [id], onDelete: Restrict) // audit ledger must never lose rows
+  productId String
+  type      InventoryMovementType
+  reason    InventoryReason
+  quantity  Int
+  note      String?
+  order     Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull) // set when reason ∈ {ORDER, CANCEL, RETURN}
+  orderId   String?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([productId]) // stock ledger per product
+  @@index([orderId]) // bonus: order → stock movements trace
+}
+
+// Exactly one of user / cartToken is set (enforced in the repository layer).
+// Postgres allows multiple NULLs, so each @unique works for guest carts.
+model Cart {
+  id        String   @id @default(cuid())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?  @unique // one cart per registered user
+  cartToken String?  @unique // guest cart key (server-side cookie value, opaque + high entropy)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade) // cart items live and die with the cart
+  cartId    String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict) // products are soft-deleted via deletedAt
+  productId String
+  quantity  Int // > 0 (enforced at the repository layer)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId]) // enables upsert line increments
+}
+
+// The order stands alone: customer snapshot fields live here, order history never changes.
+model Order {
+  id                    String      @id @default(cuid())
+  number                String      @unique // display + bank-transfer reference, format ZBL-XXXXXXXX
+  status                OrderStatus @default(PENDING)
+  customer              User?       @relation(fields: [customerId], references: [id], onDelete: SetNull) // null = guest checkout
+  customerId            String?
+  customerName          String // snapshot
+  customerPhone         String // snapshot
+  customerEmail         String? // snapshot
+  customerAddress       String // snapshot
+  customerCity          String? // snapshot
+  subtotalCents         Int // snapshot at checkout (VAT-inclusive)
+  deliveryFeeCents      Int // snapshot of DELIVERY_FEE_CENTS at checkout — env changes never rewrite history
+  totalCents            Int // subtotal + delivery
+  currency              String      @default("RWF")
+  bankTransferReference String? // customer-entered transfer ref; required for BANK_TRANSFER (backend validates)
+  idempotencyKey        String?     @unique // set to the cart id at checkout — one order per cart
+  paidAt                DateTime?
+  fulfilledAt           DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  items     OrderItem[]
+  payment   Payment?
+  movements InventoryMovement[]
+
+  @@index([status]) // dashboard order list filtered by status
+  @@index([customerId, createdAt(sort: Desc)]) // account order history + dashboard customer drill-down
+}
+
+// Price/product snapshots — order history never changes. Line total is derived (unitPriceCents × quantity) in DTOs.
+model OrderItem {
+  id             String   @id @default(cuid())
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade) // items are part of the order
+  orderId        String
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull) // null after product hard-delete; snapshot covers display
+  productId      String?
+  productName    String // snapshot
+  unitPriceCents Int // snapshot
+  quantity       Int // > 0
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([orderId]) // order detail line items
+  @@index([productId]) // bonus: top-products sales aggregation
+}
+
+// One payment per order (1:1).
+model Payment {
+  id                String        @id @default(cuid())
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade) // 1:1 — payment lifecycle is the order's
+  orderId           String        @unique
+  method            PaymentMethod
+  status            PaymentStatus @default(PENDING)
+  amountCents       Int
+  currency          String        @default("RWF")
+  providerPaymentId String? // future gateway reference; null in MVP
+  confirmedBy       User?         @relation(fields: [confirmedById], references: [id], onDelete: SetNull) // owner who manually confirmed
+  confirmedById     String?
+  confirmedAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}

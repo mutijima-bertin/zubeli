@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Laser Level Self-Leveling — Zubeli">
+  <rect width="800" height="800" rx="48" fill="#FFFBEB"/>
+  <rect x="24" y="24" width="752" height="752" rx="36" fill="none" stroke="#F59E0B" stroke-width="4"/>
+  <text x="400" y="96" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="700" fill="#1C1917" text-anchor="middle" letter-spacing="10">ZUBELI</text>
+  <line x1="556" y1="400" x2="730" y2="400" stroke="#FBBF24" stroke-width="12" stroke-linecap="round"/>
+  <line x1="244" y1="400" x2="80" y2="400" stroke="#FBBF24" stroke-width="12" stroke-linecap="round"/>
+  <line x1="400" y1="290" x2="400" y2="120" stroke="#FBBF24" stroke-width="12" stroke-linecap="round"/>
+  <rect x="240" y="292" width="320" height="216" rx="30" fill="#D97706"/>
+  <rect x="262" y="314" width="276" height="172" rx="18" fill="none" stroke="#B45309" stroke-width="5"/>
+  <circle cx="400" cy="400" r="30" fill="#1C1917"/>
+  <text x="400" y="736" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="600" fill="#1C1917" text-anchor="middle">Laser Level</text>
+</svg>

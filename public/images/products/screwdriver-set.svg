@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Screwdriver Set (8-piece) — Zubeli">
+  <rect width="800" height="800" rx="48" fill="#FFFBEB"/>
+  <rect x="24" y="24" width="752" height="752" rx="36" fill="none" stroke="#F59E0B" stroke-width="4"/>
+  <text x="400" y="96" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="700" fill="#1C1917" text-anchor="middle" letter-spacing="10">ZUBELI</text>
+  <g stroke-linecap="round">
+    <line x1="230" y1="570" x2="330" y2="470" stroke="#D97706" stroke-width="52"/>
+    <line x1="330" y1="470" x2="570" y2="230" stroke="#A8A29E" stroke-width="26"/>
+    <line x1="570" y1="230" x2="600" y2="200" stroke="#A8A29E" stroke-width="14"/>
+    <line x1="570" y1="570" x2="470" y2="470" stroke="#B45309" stroke-width="52"/>
+    <line x1="470" y1="470" x2="230" y2="230" stroke="#A8A29E" stroke-width="26"/>
+    <line x1="230" y1="230" x2="200" y2="200" stroke="#A8A29E" stroke-width="14"/>
+  </g>
+  <text x="400" y="736" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="600" fill="#1C1917" text-anchor="middle">Screwdriver Set (8-piece)</text>
+</svg>

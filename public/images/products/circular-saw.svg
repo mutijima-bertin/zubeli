@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Circular Saw 185mm — Zubeli">
+  <rect width="800" height="800" rx="48" fill="#FFFBEB"/>
+  <rect x="24" y="24" width="752" height="752" rx="36" fill="none" stroke="#F59E0B" stroke-width="4"/>
+  <text x="400" y="96" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="700" fill="#1C1917" text-anchor="middle" letter-spacing="10">ZUBELI</text>
+  <circle cx="380" cy="380" r="140" fill="#57534E"/>
+  <circle cx="380" cy="380" r="32" fill="#1C1917"/>
+  <rect x="210" y="520" width="340" height="36" rx="10" fill="#44403C"/>
+  <rect x="430" y="320" width="150" height="72" rx="18" fill="#D97706"/>
+  <text x="400" y="736" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="600" fill="#1C1917" text-anchor="middle">Circular Saw 185mm</text>
+</svg>
