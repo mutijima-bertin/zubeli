@@ -34,11 +34,17 @@ node_modules/
 *.log
 ```
 
+## PUBLISHING GUARDRAIL (hard rule)
+- This repo has NO git remote and is LOCAL-ONLY. Never `git push`, never `git remote add` / `set-url`, never `git init` a new repo, unless the USER explicitly asked and named the destination.
+- Committing locally is fine when asked; publishing is NEVER implicit. "Set up CI" means write the workflow files locally — it does not mean push or trigger anything.
+- If a task implies pushing/publishing, stop and report the requirement to the orchestrator — the user decides.
+
 ## Do NOT
 - Do not use `git add -A` without reviewing what it stages.
 - Do not commit secrets, generated files, or `.env` files (even "temporarily").
 - Do not rewrite or force-push history on shared branches.
 - Do not leave unrelated changes inside a commit (fix it with `git add -p`).
+- Do NOT push to any remote or create remotes without explicit user approval.
 
 ## Related
 `github-ops` (PR/release lifecycle), `payment-integration`

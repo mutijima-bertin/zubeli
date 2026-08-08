@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zubeli
 
-## Getting Started
+Rwanda construction-tools e-commerce — a **storefront** for customers plus an **owner dashboard** for managing the business. This is a demo MVP to show what the system will look like.
 
-First, run the development server:
+## What it is
+
+- **Storefront** — customers browse construction tools, add to cart, and check out (Pay on Delivery in the MVP).
+- **Owner dashboard** (`/admin`) — products, stock, orders, customers, and sales.
+- Built as a single Next.js app with the database running in Docker.
+
+## Tech stack
+
+- Next.js 15 (React + TypeScript), Tailwind CSS
+- Prisma + PostgreSQL
+- Vitest (unit/integration) and Playwright (e2e) for tests
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up -d                  # 1. start Postgres (dev 5434 / test 5435)
+npm run db:migrate && npm run db:seed # 2. apply schema + demo data
+npm run dev                           # 3. app at http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+First time? Also run `npm install`, then copy `cp .env.example .env.local` and replace `SESSION_SECRET` with your own `openssl rand -hex 32`. **Everything else** — setup details, demo accounts, data, tests, troubleshooting — is in **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Demo credentials (dev only)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Owner/admin: `owner@zubeli.rw` / `DemoPass2026!`
+- Customers: `umutoni@demo.rw` and `eric@demo.rw` (same demo password)
 
-## Learn More
+## Repository map
 
-To learn more about Next.js, take a look at the following resources:
+New to the repo? **[`docs/STRUCTURE.md`](docs/STRUCTURE.md)** is a one-page "where is what" map: backend (server actions + `src/lib` + `prisma`), frontend (`src/app` routes + `src/components`), shared code, tests, docs, and root config files.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Docs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| File | What it covers |
+|---|---|
+| [`docs/STRUCTURE.md`](docs/STRUCTURE.md) | Repository map — where to find backend, frontend, database, tests, docs |
+| [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | Step-by-step, non-technical guide to running the project |
+| [`docs/SCREENS.md`](docs/SCREENS.md) | Every route/page and its single owning agent |
+| [`docs/adr/`](docs/adr/) | Architecture decision records (0001-0004) |
+| [`docs/plans/`](docs/plans/) | Build plans and roadmap |
+| [`docs/reports/`](docs/reports/) | Agent summary reports (what was done, verification, next steps) |
+| [`docs/release-notes/`](docs/release-notes/) | Client-facing release notes (date-named) |
+| [`docs/notes/`](docs/notes/) | Working notes |
+| [`AGENTS.md`](AGENTS.md) | The 38-agent roster, skills, and working model |
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+_Repository is local-only (no git remote); nothing is published without explicit user approval._

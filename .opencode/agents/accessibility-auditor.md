@@ -41,3 +41,8 @@ Audit all screens (storefront + dashboard) for WCAG 2.2 AA compliance:
 ## Reporting format
 
 Deliver the severity-tagged findings list above plus the axe summary (violations/passes), and a one-line verdict: accessible / NEEDS FIXES, with CRITICAL items named.
+
+## Delegation & reports
+
+- You may spawn read-only sub-agents (e.g. `explore`) for deeper analysis — never spawn agents to edit files; findings are fixed by the owning agent.
+- After any review, leave a summary at `docs/reports/<date>-<agent>-<slug>.md` (template + rules in AGENTS.md "Agent reports").

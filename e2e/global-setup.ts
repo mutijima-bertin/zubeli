@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { bootstrapOwnerSession } from "./admin-session";
 
 /**
  * Global setup (owned by e2e-runner): point every child process at the TEST database and
@@ -38,7 +39,7 @@ function loadLocalEnvFile(): Record<string, string> {
   return env;
 }
 
-export default function globalSetup(): void {
+export default async function globalSetup(): Promise<void> {
   const envFile = loadLocalEnvFile();
   const testDatabaseUrl = envFile.TEST_DATABASE_URL ?? process.env.TEST_DATABASE_URL;
   if (!testDatabaseUrl) {
@@ -71,4 +72,12 @@ export default function globalSetup(): void {
   // Seed via the configured prisma seed command (prisma/seed.ts, owned by database-agent).
   execSync(`${prismaBin} db seed`, { stdio: "inherit", env: process.env });
   console.log("[e2e global-setup] Test database reset + seeded.");
+
+  // ONE real owner login per run, persisted for the admin specs. Runs AFTER the
+  // reseed (the seeded owner must exist) and AFTER the dev server is up
+  // (Playwright starts webServer before globalSetup). Stray next-server
+  // processes on :3000 must be killed before the run or the webServer is
+  // reused and the login may hit a stale/different DB — see RUNBOOK.
+  await bootstrapOwnerSession();
+  console.log("[e2e global-setup] Owner session bootstrapped -> test-results/.owner-session.json");
 }

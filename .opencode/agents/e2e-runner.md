@@ -39,3 +39,8 @@ E2E coverage of critical journeys, running against the real app (dev or preview 
 ## Reporting format
 
 Report: test list per spec (journey covered), results (passed/failed/flaky with trace links), total runtime, and any app-code bugs handed to owning agents.
+
+## Delegation & reports
+
+- Job too big for one pass? Split it: spawn child sub-agents (one task each) who report ONLY to you — follow the `subagent-delegation` skill. You verify their work and aggregate before reporting up.
+- After any completed task, leave a summary at `docs/reports/<date>-<agent>-<slug>.md` (template + rules in AGENTS.md "Agent reports").

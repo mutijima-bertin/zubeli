@@ -3,7 +3,6 @@
  * Customer account actions. Every owned fetch carries an IDOR check
  * (order.customerId === session user id, ADR 0002).
  */
-import { revalidatePath } from 'next/cache';
 import { profileSchema } from '@/lib/validation/auth';
 import { orderIdSchema, pageParamsSchema } from '@/lib/validation/orders';
 import { requireUser } from '@/lib/auth/session';
@@ -45,7 +44,6 @@ export async function getMyOrderAction(input: unknown): Promise<ActionResult<Ord
     dto.paymentInstructions = order.payment
       ? buildPaymentInstructions(order, order.payment.method)
       : null;
-    revalidatePath(`/account/orders/${order.id}`);
     return { ok: true, data: dto };
   } catch (error) {
     return toActionResult(error);

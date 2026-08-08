@@ -7,14 +7,17 @@
  */
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { checkoutSchema } from '@/lib/validation/checkout';
+import { orderIdSchema } from '@/lib/validation/orders';
 import { getSession } from '@/lib/auth/session';
 import { ensureCart, getCart } from '@/lib/cart';
 import { buildCheckoutContext, placeOrder } from '@/lib/orders';
+import { getOrderById } from '@/lib/db/orders';
+import { buildPaymentInstructions } from '@/lib/payments';
 import { clientIp } from '@/lib/request';
 import { assertRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
-import { toActionResult } from '@/lib/errors';
+import { NotFoundError, toActionResult } from '@/lib/errors';
 import { toOrderDTO } from '@/lib/dto';
-import type { ActionResult, CartDTO, CheckoutResult } from '@/types/api';
+import type { ActionResult, CartDTO, CheckoutResult, PaymentInstructions } from '@/types/api';
 
 export async function getCheckoutCartAction(): Promise<ActionResult<CartDTO>> {
   try {
@@ -48,6 +51,33 @@ export async function createOrderAction(input: unknown): Promise<ActionResult<Ch
     revalidateTag(`cart:${cart.id}`);
     revalidatePath('/account/orders');
     revalidatePath('/admin/orders');
+
+    return { ok: true, data: { order: toOrderDTO(order), paymentInstructions } };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+/**
+ * Public order lookup for the guest checkout success page (Decision A,
+ * storefront-build-plan). No auth — the order id (cuid) is high-entropy and
+ * only known to the customer who just placed the order. Mirrors
+ * createOrderAction's CheckoutResult shape exactly so the success screen
+ * renders identical data. No rate limit: the sibling read action
+ * (getCheckoutCartAction) has none either, and a per-IP limiter would
+ * 429 legitimate success-page refreshes.
+ */
+export async function getCheckoutOrderAction(input: unknown): Promise<ActionResult<CheckoutResult>> {
+  try {
+    const { orderId } = orderIdSchema.parse(input);
+    const order = await getOrderById(orderId);
+    if (!order) throw new NotFoundError('Order not found');
+
+    // Payment is always created 1:1 with the order (createOrder); the fallback
+    // keeps this total for any corrupt row, same as placeOrder.
+    const paymentInstructions: PaymentInstructions = order.payment
+      ? buildPaymentInstructions(order, order.payment.method)
+      : { title: 'Payment on delivery', steps: [] };
 
     return { ok: true, data: { order: toOrderDTO(order), paymentInstructions } };
   } catch (error) {

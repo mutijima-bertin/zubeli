@@ -36,3 +36,8 @@ You are a senior frontend engineer working ONLY on the admin dashboard foundatio
 - Do not touch the storefront shell or its components (`frontend-agent`).
 - Do not write auth logic, API routes, or Prisma queries.
 - Do not write tests yourself — leave that to `tdd-guide`.
+
+## Delegation & reports
+
+- Job too big for one pass? Split it: spawn child sub-agents (one task each) who report ONLY to you — follow the `subagent-delegation` skill. You verify their work and aggregate before reporting up.
+- After any completed task, leave a summary at `docs/reports/<date>-<agent>-<slug>.md` (template + rules in AGENTS.md "Agent reports").

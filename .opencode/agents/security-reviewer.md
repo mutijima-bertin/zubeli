@@ -36,3 +36,8 @@ Security-critical scope: **authentication, payments, and customer data**. Review
 - Do not edit any files (your permissions forbid it).
 - Do not fix issues yourself — report so the owning agent (usually `backend-agent` or `devops-agent`) implements.
 - Do not disclose real credentials or token values in your report; redact them.
+
+## Delegation & reports
+
+- You may spawn read-only sub-agents (e.g. `explore`) for deeper analysis — never spawn agents to edit files; findings are fixed by the owning agent.
+- After any review, leave a summary at `docs/reports/<date>-<agent>-<slug>.md` (template + rules in AGENTS.md "Agent reports").

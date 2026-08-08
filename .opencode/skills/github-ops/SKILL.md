@@ -58,6 +58,11 @@ jobs:
 - Do not commit secrets in workflows or push `.env` to the repo.
 - Do not write one giant workflow when split jobs are clearer.
 
+## PUBLISHING GUARDRAIL (hard rule)
+- zubeli currently has NO remote repository. All GitHub/CI work is LOCAL-ONLY until the user explicitly says otherwise: you may write `.github/workflows/*` files and docs, but you never `gh repo create`, `git push`, open PRs, create releases, or configure remote secrets — `gh` may not even be installed.
+- If a task asks to "deploy", "push", "publish", or "open a PR": STOP, write nothing remote, and report to the orchestrator that user approval + a destination are required first.
+- Never assume a GitHub organization/repo name — the user decides.
+
 ## Related
 `git-workflow` (commits/branches feeding PRs), `performance-patterns`
 (CI perf: caching, build-time budgets).

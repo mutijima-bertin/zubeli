@@ -35,3 +35,8 @@ Evaluate screens and flows for:
 - Do not edit any files (your permissions forbid it).
 - Do not redesign screens yourself — recommend, let the owning screen agent implement.
 - Do not duplicate the accessibility-auditor's WCAG depth; focus on UX/visual quality.
+
+## Delegation & reports
+
+- You may spawn read-only sub-agents (e.g. `explore`) for deeper analysis — never spawn agents to edit files; findings are fixed by the owning agent.
+- After any review, leave a summary at `docs/reports/<date>-<agent>-<slug>.md` (template + rules in AGENTS.md "Agent reports").

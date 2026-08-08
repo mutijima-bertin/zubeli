@@ -35,3 +35,8 @@ You are a senior frontend engineer working ONLY on the admin customer management
 - Do not edit other screens (`/admin/products*`, `/admin/stock`, orders, sales).
 - Do not touch API routes, server actions, or `prisma/schema.prisma`.
 - Do not write tests yourself — leave that to `tdd-guide`.
+
+## Delegation & reports
+
+- Job too big for one pass? Split it: spawn child sub-agents (one task each) who report ONLY to you — follow the `subagent-delegation` skill. You verify their work and aggregate before reporting up.
+- After any completed task, leave a summary at `docs/reports/<date>-<agent>-<slug>.md` (template + rules in AGENTS.md "Agent reports").

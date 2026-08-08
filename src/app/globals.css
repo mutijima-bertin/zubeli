@@ -24,10 +24,22 @@
     color: var(--foreground);
   }
 
-  /* Visible focus ring — WCAG 2.2 AA: always shown on keyboard focus */
+  /* Visible focus ring — WCAG 2.2 AA: always shown on keyboard focus.
+     brand-700 (#b45309) clears the 2.4.13 3:1 contrast requirement on
+     light page backgrounds (5.02:1 on white); brand-500 (#f59e0b) was 2.15:1. */
   :focus-visible {
-    outline: 2px solid #f59e0b;
+    outline: 2px solid #b45309;
     outline-offset: 2px;
     border-radius: 2px;
+  }
+
+  /* Design-system motion honors prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-zoom-in,
+    .animate-slide-in-right,
+    .animate-slide-in-up {
+      animation: none;
+    }
   }
 }

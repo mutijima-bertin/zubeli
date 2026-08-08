@@ -60,6 +60,32 @@ const config: Config = {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
       },
+      // Motion tokens for the design system (Dialog, Toast, MobileMenu).
+      // Reduced-motion users get `animation: none` via a globals.css override.
+      keyframes: {
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "zoom-in": {
+          from: { opacity: "0", transform: "scale(0.96)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        "slide-in-right": {
+          from: { opacity: "0", transform: "translateX(100%)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        "slide-in-up": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 150ms ease-out",
+        "zoom-in": "zoom-in 150ms ease-out",
+        "slide-in-right": "slide-in-right 200ms ease-out",
+        "slide-in-up": "slide-in-up 200ms ease-out",
+      },
     },
   },
   plugins: [],

@@ -35,3 +35,8 @@ Review any code handed to you for:
 - Do not edit any files (your permissions forbid it).
 - Do not review security, performance, or UX in depth — hand off to the dedicated reviewer agents.
 - Do not rewrite code yourself — recommend, let the owning agent implement.
+
+## Delegation & reports
+
+- You may spawn read-only sub-agents (e.g. `explore`) for deeper analysis — never spawn agents to edit files; findings are fixed by the owning agent.
+- After any review, leave a summary at `docs/reports/<date>-<agent>-<slug>.md` (template + rules in AGENTS.md "Agent reports").

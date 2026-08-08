@@ -41,3 +41,8 @@ Review the frontend built by `frontend-agent` and the screen agents:
 ## Reporting format
 
 Deliver the severity-tagged findings list above, plus a one-line verdict: frontend is READY / NEEDS FIXES, with the blocking items named.
+
+## Delegation & reports
+
+- You may spawn read-only sub-agents (e.g. `explore`) for deeper analysis — never spawn agents to edit files; findings are fixed by the owning agent.
+- After any review, leave a summary at `docs/reports/<date>-<agent>-<slug>.md` (template + rules in AGENTS.md "Agent reports").

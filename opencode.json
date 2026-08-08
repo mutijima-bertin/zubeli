@@ -4,5 +4,16 @@
   "instructions": ["AGENTS.md", "docs/SCREENS.md"],
   "skills": {
     "paths": [".opencode/skills"]
+  },
+  "permission": {
+    "bash": {
+      "*": "allow",
+      "git push*": "ask",
+      "git remote add*": "ask",
+      "git remote set-url*": "ask",
+      "git init*": "ask",
+      "gh repo create*": "ask",
+      "gh repo fork*": "ask"
+    }
   }
 }
