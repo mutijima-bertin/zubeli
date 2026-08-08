@@ -54,7 +54,12 @@ export default async function LoginPage({
   const nextPath = sanitizeNextPath(Array.isArray(next) ? next[0] : next);
 
   const session = await getSession();
-  if (session) redirect(nextPath);
+  if (session) {
+    // Same owner-default rule as the client form: an already-signed-in
+    // OWNER revisiting /login goes to /admin unless an explicit `?next`
+    // (e.g. middleware's /login?next=%2Fadmin) says otherwise.
+    redirect(session.role === "OWNER" && nextPath === "/account" ? "/admin" : nextPath);
+  }
 
   return (
     <div className="mx-auto w-full max-w-md px-4 py-10 sm:py-16">

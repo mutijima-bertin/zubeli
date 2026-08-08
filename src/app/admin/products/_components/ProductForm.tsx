@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useRef, useState, useTransition, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   createProductAction,
   updateProductAction,
@@ -10,13 +11,14 @@ import {
   Alert,
   Button,
   FormField,
-  IconPlus,
   IconX,
   Input,
   Select,
+  Spinner,
   Textarea,
+  cx,
 } from "@/components/ui";
-import type { ActionResult, ProductDTO } from "@/types/api";
+import type { ActionResult, ProductDTO, UploadResult } from "@/types/api";
 
 /** ZodError fieldErrors shape (src/lib/errors.ts toActionResult). */
 type FieldErrors = Record<string, string[] | undefined>;
@@ -31,6 +33,46 @@ function getFieldErrors(details: unknown): FieldErrors {
 export type CategoryOption = { id: string; slug: string; name: string };
 
 const MAX_IMAGES = 8;
+
+/** Decorative inline icon (same stroke style as the design-system set). */
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 16V4m0 0 4 4m-4-4-4 4" />
+      <path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" />
+    </svg>
+  );
+}
+
+/** POST /api/admin/upload — contract in src/types/api.ts (UploadResult). */
+async function uploadImage(file: File): Promise<UploadResult> {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await fetch("/api/admin/upload", { method: "POST", body });
+  return (await response.json()) as UploadResult;
+}
+
+function describeUploadError(error: Extract<UploadResult, { ok: false }>["error"]): string {
+  switch (error.code) {
+    case "UPLOAD_TOO_LARGE":
+      return "That file is over 2 MB — the maximum is 2 MB per image.";
+    case "UPLOAD_TYPE_REJECTED":
+      return "Only JPG, PNG and WebP images are allowed.";
+    case "UNAUTHORIZED":
+      return "Your session expired — sign in again and retry the upload.";
+    default:
+      return error.message || "The upload failed — try again.";
+  }
+}
 
 /**
  * Product create/edit form (Inventory). Shared by /admin/products/new and
@@ -72,8 +114,15 @@ export function ProductForm({
   const [internalPublished, setInternalPublished] = useState(initial?.isPublished ?? false);
   const [internalFeatured, setInternalFeatured] = useState(initial?.featured ?? false);
   const [imageUrls, setImageUrls] = useState<string[]>(
-    initial?.imageUrls.length ? initial.imageUrls : [""],
+    initial?.imageUrls.filter((url) => url.trim().length > 0) ?? [],
   );
+
+  // Image upload field state (POST /api/admin/upload).
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadingNames, setUploadingNames] = useState<string[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const error = result && !result.ok ? result.error : null;
   const fieldErrors = getFieldErrors(error?.details);
@@ -94,12 +143,70 @@ export function ProductForm({
     else setInternalFeatured(value);
   }
 
-  function updateImage(index: number, value: string) {
-    setImageUrls((prev) => prev.map((url, i) => (i === index ? value : url)));
+  function handleFilesChanged(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    void uploadFiles(files);
   }
 
-  function addImage() {
-    setImageUrls((prev) => (prev.length < MAX_IMAGES ? [...prev, ""] : prev));
+  function handleDragEnter(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    dragDepth.current += 1;
+    setIsDragging(true);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0;
+      setIsDragging(false);
+    }
+  }
+
+  function handleDrop(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    dragDepth.current = 0;
+    setIsDragging(false);
+    void uploadFiles(Array.from(event.dataTransfer.files));
+  }
+
+  /** Uploads files one at a time; each success appends to imageUrls (max 8). */
+  async function uploadFiles(files: File[]) {
+    if (files.length === 0) return;
+    setUploadError(null);
+
+    const freeSlots = Math.max(0, MAX_IMAGES - imageUrls.length);
+    if (freeSlots === 0) {
+      setUploadError(`You can add up to ${MAX_IMAGES} images — remove one before adding more.`);
+      return;
+    }
+
+    const accepted = files.slice(0, freeSlots);
+    if (accepted.length < files.length) {
+      setUploadError(
+        `Only ${accepted.length} of ${files.length} added — you can keep up to ${MAX_IMAGES} images.`,
+      );
+    }
+
+    for (const file of accepted) {
+      setUploadingNames((prev) => [...prev, file.name]);
+      try {
+        const result = await uploadImage(file);
+        if (result.ok) {
+          setImageUrls((prev) => (prev.length < MAX_IMAGES ? [...prev, result.data.url] : prev));
+        } else {
+          setUploadError((prev) => prev ?? describeUploadError(result.error));
+        }
+      } catch {
+        setUploadError((prev) => prev ?? "The upload failed — try again.");
+      }
+      setUploadingNames((prev) => prev.filter((name) => name !== file.name));
+    }
   }
 
   function removeImage(index: number) {
@@ -155,6 +262,12 @@ export function ProductForm({
   }
 
   const imageError = fieldErrors.imageUrls?.join(" ");
+
+  // Non-empty URLs with their original array index (removal must target the
+  // same slot in imageUrls that the thumbnail represents).
+  const previewUrls = imageUrls
+    .map((url, index) => ({ url: url.trim(), index }))
+    .filter((entry) => entry.url.length > 0);
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6">
@@ -293,42 +406,94 @@ export function ProductForm({
       </div>
 
       <fieldset className="rounded-xl border border-stone-200 bg-white p-5 shadow-card">
-        <legend className="px-1 text-sm font-semibold text-ink">Images (MVP: URLs)</legend>
+        <legend className="px-1 text-sm font-semibold text-ink">Images</legend>
         <p className="text-xs text-stone-500">
-          Seeded placeholder images live at /images/products/&lt;slug&gt;.svg. Image upload ships
-          later — paste the public URL or a path under /images for now.
+          Photos are stored locally and served from /uploads. The first image is the cover on the
+          catalog.
         </p>
-        <div className="mt-3 space-y-2">
-          {imageUrls.map((url, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <Input
-                value={url}
-                onChange={(event) => updateImage(index, event.target.value)}
-                placeholder={`Image URL ${index + 1}`}
-                aria-label={`Image URL ${index + 1}`}
-                maxLength={500}
-              />
-              {imageUrls.length > 1 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Remove image ${index + 1}`}
-                  onClick={() => removeImage(index)}
+
+        <div className="mt-3">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={handleFilesChanged}
+          />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            aria-label="Add product images"
+            className={cx(
+              "flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors",
+              isDragging
+                ? "border-brand-600 bg-brand-50 text-brand-700"
+                : "border-stone-300 bg-stone-50 text-ink hover:border-brand-400 hover:bg-brand-50/60",
+            )}
+          >
+            <UploadIcon className="size-7 text-stone-400" />
+            <span className="mt-1 text-sm font-semibold">
+              Drag &amp; drop photos here, or click to browse
+            </span>
+            <span className="text-xs text-stone-500">JPG, PNG or WebP · max 2 MB per file</span>
+          </button>
+
+          {uploadingNames.length > 0 && (
+            <ul className="mt-3 space-y-1.5" aria-label="Uploads in progress">
+              {uploadingNames.map((name, index) => (
+                <li key={`${index}-${name}`} className="flex items-center gap-2 text-xs text-stone-600">
+                  <Spinner size="sm" label={`Uploading ${name}`} />
+                  <span className="min-w-0 truncate">{name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {uploadError && (
+            <Alert tone="danger" title="Image upload failed" className="mt-3">
+              {uploadError}
+            </Alert>
+          )}
+
+          {previewUrls.length > 0 && (
+            <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
+              {previewUrls.map(({ url, index }) => (
+                <li
+                  key={`${index}-${url}`}
+                  className="relative aspect-square overflow-hidden rounded-lg border border-stone-200 bg-stone-100"
                 >
-                  <IconX className="size-4" />
-                </Button>
-              )}
-            </div>
-          ))}
+                  <Image
+                    src={url}
+                    alt={`Product image ${index + 1}`}
+                    fill
+                    sizes="(min-width: 40rem) 9rem, 33vw"
+                    className="object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    aria-label={`Remove image ${index + 1}`}
+                    className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-white/90 text-ink shadow-sm transition-colors hover:bg-white hover:text-danger-600"
+                  >
+                    <IconX className="size-4" />
+                  </button>
+                  <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
+                    {index + 1}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {imageError && <p className="mt-2 text-sm text-danger-600">{imageError}</p>}
         </div>
-        {imageError && <p className="mt-2 text-sm text-danger-600">{imageError}</p>}
-        {imageUrls.length < MAX_IMAGES && (
-          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={addImage}>
-            <IconPlus className="size-4" />
-            Add image
-          </Button>
-        )}
       </fieldset>
 
       <div className="grid gap-4 sm:grid-cols-2">

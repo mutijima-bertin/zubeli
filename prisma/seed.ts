@@ -20,6 +20,8 @@ const prisma = new PrismaClient();
 const DELIVERY_FEE_CENTS = Number(process.env.DELIVERY_FEE_CENTS ?? 2000);
 const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'owner@zubeli.rw';
 const SEED_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'DemoPass2026!';
+const SEED_ADMIN_2_EMAIL = process.env.SEED_ADMIN_2_EMAIL ?? 'mutijima@gmail.com';
+const SEED_ADMIN_2_PASSWORD = process.env.SEED_ADMIN_2_PASSWORD ?? 'Mutijima1.';
 const DEMO_PASSWORD = 'DemoPass2026!'; // shared demo password for seeded customers (dev-only)
 
 const daysAgo = (days: number, extraHours = 0) =>
@@ -200,7 +202,7 @@ const orders: OrderSpec[] = [
 // ---------------------------------------------------------------------------
 
 async function main() {
-  // 1. Users — owner + demo customers
+  // 1. Users — owners + demo customers
   const owner = await prisma.user.upsert({
     where: { email: SEED_ADMIN_EMAIL },
     update: {},
@@ -208,6 +210,18 @@ async function main() {
       email: SEED_ADMIN_EMAIL,
       passwordHash: await bcrypt.hash(SEED_ADMIN_PASSWORD, 10),
       name: 'Zubeli Owner',
+      role: Role.OWNER,
+    },
+  });
+
+  // Second admin — permanent fixture (survives reseeds; upsert keyed by email)
+  await prisma.user.upsert({
+    where: { email: SEED_ADMIN_2_EMAIL },
+    update: {},
+    create: {
+      email: SEED_ADMIN_2_EMAIL,
+      passwordHash: await bcrypt.hash(SEED_ADMIN_2_PASSWORD, 10),
+      name: 'Mutijima Bertin',
       role: Role.OWNER,
     },
   });
@@ -438,7 +452,7 @@ async function main() {
     ]);
 
   console.log('Zubeli seed complete.');
-  console.log(`  users: ${userCount} (owner: ${SEED_ADMIN_EMAIL})`);
+  console.log(`  users: ${userCount} (owners: ${SEED_ADMIN_EMAIL}, ${SEED_ADMIN_2_EMAIL})`);
   console.log(`  categories: ${categoryCount}`);
   console.log(`  products: ${productCount}`);
   console.log(`  orders: ${orderCount} (created this run: ${createdOrders})`);

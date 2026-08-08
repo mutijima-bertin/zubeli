@@ -7,6 +7,11 @@ export const metadata = {
   title: "Admin | Zubeli",
 };
 
+// Auth-guarded dashboard reads cookies via getSession() — declare the whole
+// /admin subtree dynamic up front so Next never attempts static generation
+// (silences build-time DYNAMIC_SERVER_USAGE noise; all admin routes are ƒ).
+export const dynamic = "force-dynamic";
+
 /**
  * Admin shell — step 1 of the dashboard milestone. Purely presentational:
  * sidebar navigation (desktop rail + mobile drawer) and the top bar render

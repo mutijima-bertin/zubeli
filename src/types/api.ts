@@ -22,7 +22,12 @@ export type ErrorCode =
   | 'INVALID_TRANSITION'
   | 'RATE_LIMITED'
   | 'CONFLICT'
-  | 'INTERNAL';
+  | 'INTERNAL'
+  // POST /api/admin/upload codes — fixed contract, consumed by the product form.
+  | 'UPLOAD_FAILED'
+  | 'UPLOAD_TOO_LARGE'
+  | 'UPLOAD_TYPE_REJECTED'
+  | 'UNAUTHORIZED';
 
 export type ApiError = {
   code: ErrorCode;
@@ -33,6 +38,13 @@ export type ApiError = {
 
 /** Returned by every server action. Never throw across the action boundary except `redirect()`. */
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: ApiError };
+
+/**
+ * POST /api/admin/upload response (guarded admin image upload, backend-agent).
+ * `data.url` is a LOCAL path (`/uploads/products/<uuid>.<ext>`) — prefix with
+ * the site origin when displaying, never an absolute URL.
+ */
+export type UploadResult = ActionResult<{ url: string }>;
 
 /** Cursor pagination envelope — used by every list action (ADR 0004). */
 export type Page<T> = {

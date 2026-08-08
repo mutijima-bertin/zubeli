@@ -17,9 +17,10 @@ function getFieldErrors(details: unknown): FieldErrors {
 
 /**
  * Sign-in form (Phase C-5 — account-agent). Submits to loginAction; on
- * success pushes the (server-sanitized) `?next` destination or /account.
- * Page-level errors (wrong credentials, rate limit) render in an Alert;
- * field-level Zod errors render under their inputs via FormField.
+ * success pushes the (server-sanitized) `?next` destination, or /account
+ * (or /admin for OWNERs without an explicit ?next). Page-level errors
+ * (wrong credentials, rate limit) render in an Alert; field-level Zod
+ * errors render under their inputs via FormField.
  */
 export function LoginForm({ nextPath }: { nextPath: string }) {
   const router = useRouter();
@@ -38,7 +39,13 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
     startTransition(async () => {
       const res = await loginAction(Object.fromEntries(formData.entries()));
       if (res.ok) {
-        router.push(nextPath);
+        // Owners land on the dashboard unless they came with an explicit
+        // `?next` (e.g. middleware bouncing /admin → /login?next=%2Fadmin).
+        const dest =
+          res.data.role === "OWNER" && nextPath === "/account"
+            ? "/admin"
+            : nextPath;
+        router.push(dest);
         router.refresh();
       } else {
         setResult(res);

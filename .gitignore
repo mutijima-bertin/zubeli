@@ -21,6 +21,9 @@ test-results/
 *.log
 npm-debug.log*
 
+# runtime user uploads (admin product images — never committed)
+/public/uploads/
+
 # misc
 .DS_Store
 *.tsbuildinfo
