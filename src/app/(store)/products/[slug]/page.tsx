@@ -8,6 +8,7 @@ import { PriceBlock } from "./_components/PriceBlock";
 import { RelatedProducts } from "./_components/RelatedProducts";
 import { SpecsTable } from "./_components/SpecsTable";
 import { StockStatus } from "./_components/StockStatus";
+import { TrustStrip } from "./_components/TrustStrip";
 
 /**
  * Product detail (Phase C-2 — product-page-agent).
@@ -133,6 +134,9 @@ export default async function ProductPage({
           <div className="mt-6">
             <AddToCartButton product={product} />
           </div>
+
+          {/* Buy-box trust strip — delivery + payment reassurance (see TrustStrip). */}
+          <TrustStrip />
 
           {product.stockQty <= 0 && (
             <p className="mt-4 text-sm text-stone-600">

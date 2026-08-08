@@ -7,12 +7,11 @@
   --foreground: #1c1917;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0c0a09;
-    --foreground: #f5f5f4;
-  }
-}
+/* LIGHT-ONLY, deliberate: the previous prefers-color-scheme: dark override
+   flipped the body background while every component hardcodes light surfaces
+   (bg-white cards, bg-stone-50 footer), producing a broken half-dark hybrid
+   on dark-mode OSes (ui-ux-pro-max audit #2). A full dark theme is future
+   work; until then the storefront is consistently light. */
 
 @layer base {
   html {
@@ -24,6 +23,15 @@
     color: var(--foreground);
   }
 
+  /* Cursor discipline (ui-ux-pro-max audit #6): clickable elements show a
+     pointer unless disabled. Tailwind v3 preflight does not add this. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+
   /* Visible focus ring — WCAG 2.2 AA: always shown on keyboard focus.
      brand-700 (#b45309) clears the 2.4.13 3:1 contrast requirement on
      light page backgrounds (5.02:1 on white); brand-500 (#f59e0b) was 2.15:1. */
@@ -33,13 +41,16 @@
     border-radius: 2px;
   }
 
-  /* Design-system motion honors prefers-reduced-motion */
+  /* Motion honors prefers-reduced-motion (ui-ux-pro-max audit #10):
+     kill animation/transition durations globally (canonical shadcn snippet). */
   @media (prefers-reduced-motion: reduce) {
-    .animate-fade-in,
-    .animate-zoom-in,
-    .animate-slide-in-right,
-    .animate-slide-in-up {
-      animation: none;
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }

@@ -1,0 +1,8 @@
+# 2026-08-08 — docs-writer — pro-max status (index + AGENTS.md)
+
+- What was done: indexed the ui-ux pro-max pass and added its status line to AGENTS.md.
+- `docs/reports/README.md` — appended 9 rows after the existing 7 (lines 47–55): `uiux-reviewer/pro-max-audit`, `frontend-agent/pro-max-foundation`, `homepage-agent/hero-collage`, `checkout-agent/mobile-summary`, `account-agent/password-toggle`, `dashboard-agent/table-toast`, `sales-agent/chart-v2`, `inventory-agent/type-floor`, `runner/pro-max-checkpoint` (final checkpoint of the pass; the runner's report file is not on disk yet — entry added per instruction, link will resolve when it lands).
+- `AGENTS.md` — one new bullet under "Current status", inserted between the FINAL RUNNER CHECKPOINT line and "Open work" (line 91): "Pro-max design pass (2026-08-08) … reports index updated." "What remains"/Decided/roster untouched — no backlog item (M1/M2/L1–L5, storefront L1–L8, carry-forwards) was completed by the pro-max wave.
+- Facts verified against each report file on disk before writing; no numbers invented — the runner line says "numbers as runner reported" and points at the pending runner report instead of guessing.
+- Verification: re-read both edited files — index table well-formed (55 lines), status bullet in place, no other sections touched.
+- Next steps: when runner-pro-max-checkpoint lands, confirm its numbers match the index/status phrasing (docs-writer follow-up, one-line update if numbers differ).

@@ -116,14 +116,30 @@ describe("getCatalogPage", () => {
     expect(listPublishedM).toHaveBeenCalledWith({
       categorySlug: undefined,
       search: undefined,
+      minPriceCents: undefined,
+      maxPriceCents: undefined,
+      stock: undefined,
       sort: "newest",
       cursor: undefined,
       limit: CATALOG_PAGE_SIZE,
     });
+    expect(listAllM).toHaveBeenCalledWith({
+      search: undefined,
+      minPriceCents: undefined,
+      maxPriceCents: undefined,
+      stock: undefined,
+    });
     expect(data.page.items).toHaveLength(2);
     expect(data.page.nextCursor).toBe("c-2");
     expect(data.page.hasMore).toBe(true);
-    expect(data.filter).toEqual({ q: null, cat: null, sort: "newest" });
+    expect(data.filter).toEqual({
+      q: null,
+      cat: null,
+      sort: "newest",
+      minPrice: null,
+      maxPrice: null,
+      avail: null,
+    });
   });
 
   it("passes filters/cursor through and normalizes an invalid sort", async () => {
@@ -135,11 +151,21 @@ describe("getCatalogPage", () => {
     expect(listPublishedM).toHaveBeenCalledWith({
       categorySlug: "power-tools",
       search: "drill",
+      minPriceCents: undefined,
+      maxPriceCents: undefined,
+      stock: undefined,
       sort: "newest", // invalid input normalized
       cursor: "c-7",
       limit: CATALOG_PAGE_SIZE,
     });
-    expect(data.filter).toEqual({ q: "drill", cat: "power-tools", sort: "newest" });
+    expect(data.filter).toEqual({
+      q: "drill",
+      cat: "power-tools",
+      sort: "newest",
+      minPrice: null,
+      maxPrice: null,
+      avail: null,
+    });
   });
 
   it("supports price-asc and echoes it", async () => {
@@ -150,6 +176,126 @@ describe("getCatalogPage", () => {
 
     expect(listPublishedM).toHaveBeenCalledWith(expect.objectContaining({ sort: "price-asc" }));
     expect(data.filter.sort).toBe("price-asc");
+  });
+
+  it("multi-field search: passes q to the product list AND the category counts", async () => {
+    listPublishedM.mockResolvedValue({ items: PRODUCTS, nextCursor: null, hasMore: false });
+    listAllM.mockResolvedValue(CATEGORIES);
+
+    const data = await getCatalogPage({ q: "saw" });
+
+    expect(listPublishedM).toHaveBeenCalledWith(
+      expect.objectContaining({ search: "saw", categorySlug: undefined }),
+    );
+    // counts answer "how many in THIS category match the current search"
+    expect(listAllM).toHaveBeenCalledWith(expect.objectContaining({ search: "saw" }));
+    expect(data.filter.q).toBe("saw");
+  });
+
+  it("passes RWF minPrice/maxPrice through IDENTITY to the list + counts (1 RWF = 1 stored unit, ADR 0004) and echoes them", async () => {
+    listPublishedM.mockResolvedValue({ items: PRODUCTS, nextCursor: null, hasMore: false });
+    listAllM.mockResolvedValue(CATEGORIES);
+
+    const data = await getCatalogPage({ minPrice: "10000", maxPrice: "50000" });
+
+    expect(listPublishedM).toHaveBeenCalledWith(
+      expect.objectContaining({ minPriceCents: 10000, maxPriceCents: 50000 }),
+    );
+    expect(listAllM).toHaveBeenCalledWith(
+      expect.objectContaining({ minPriceCents: 10000, maxPriceCents: 50000 }),
+    );
+    expect(data.filter).toMatchObject({ minPrice: 10000, maxPrice: 50000 });
+  });
+
+  it("passes only the bound the client gave", async () => {
+    listPublishedM.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
+    listAllM.mockResolvedValue([]);
+
+    await getCatalogPage({ minPrice: "0" });
+
+    expect(listPublishedM).toHaveBeenCalledWith(
+      expect.objectContaining({ minPriceCents: 0, maxPriceCents: undefined }),
+    );
+    const data = await getCatalogPage({ maxPrice: "750" });
+    expect(listAllM).toHaveBeenCalledWith(
+      expect.objectContaining({ minPriceCents: undefined, maxPriceCents: 750 }),
+    );
+    expect(data.filter.maxPrice).toBe(750);
+  });
+
+  it("maps avail in/low/out to stock buckets and echoes it", async () => {
+    listPublishedM.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
+    listAllM.mockResolvedValue([]);
+
+    for (const avail of ["in", "low", "out"] as const) {
+      const data = await getCatalogPage({ avail });
+      expect(listPublishedM).toHaveBeenLastCalledWith(expect.objectContaining({ stock: avail }));
+      expect(listAllM).toHaveBeenLastCalledWith(expect.objectContaining({ stock: avail }));
+      expect(data.filter.avail).toBe(avail);
+    }
+  });
+
+  it.each([
+    { minPrice: "abc", maxPrice: "-5", avail: "bogus" },
+    { minPrice: "12.5", maxPrice: "1e3", avail: "instock" },
+    { minPrice: "-10", maxPrice: "", avail: "" },
+  ])("ignores invalid params %j (never throws, treated as absent)", async (params) => {
+    listPublishedM.mockResolvedValue({ items: PRODUCTS, nextCursor: null, hasMore: false });
+    listAllM.mockResolvedValue(CATEGORIES);
+
+    const data = await getCatalogPage(params);
+
+    expect(listPublishedM).toHaveBeenCalledWith(
+      expect.objectContaining({ minPriceCents: undefined, maxPriceCents: undefined, stock: undefined }),
+    );
+    expect(listAllM).toHaveBeenCalledWith(
+      expect.objectContaining({ minPriceCents: undefined, maxPriceCents: undefined, stock: undefined }),
+    );
+    expect(data.filter).toMatchObject({ minPrice: null, maxPrice: null, avail: null });
+    expect(data.page.items).toHaveLength(2); // filters treated as absent → normal page
+  });
+
+  it("applies q + price + avail additively to BOTH the list and the counts", async () => {
+    listPublishedM.mockResolvedValue({ items: PRODUCTS, nextCursor: null, hasMore: false });
+    listAllM.mockResolvedValue([
+      { ...CATEGORIES[0]!, productCount: 1 },
+      { ...CATEGORIES[1]!, productCount: 0 },
+    ]);
+
+    const data = await getCatalogPage({
+      q: "drill",
+      cat: "power-tools",
+      minPrice: "20000",
+      maxPrice: "100000",
+      avail: "in",
+    });
+
+    expect(listPublishedM).toHaveBeenCalledWith({
+      categorySlug: "power-tools",
+      search: "drill",
+      minPriceCents: 20000,
+      maxPriceCents: 100000,
+      stock: "in",
+      sort: "newest",
+      cursor: undefined,
+      limit: CATALOG_PAGE_SIZE,
+    });
+    // counts apply search/price/avail but NOT the category (chip is the category itself)
+    expect(listAllM).toHaveBeenCalledWith({
+      search: "drill",
+      minPriceCents: 20000,
+      maxPriceCents: 100000,
+      stock: "in",
+    });
+    expect(data.filter).toEqual({
+      q: "drill",
+      cat: "power-tools",
+      sort: "newest",
+      minPrice: 20000,
+      maxPrice: 100000,
+      avail: "in",
+    });
+    expect(data.categories[0]!.productCount).toBe(1); // mocked count — passthrough
   });
 });
 

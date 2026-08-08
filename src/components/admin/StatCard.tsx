@@ -51,7 +51,7 @@ export function StatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-stone-500">{title}</p>
-          <p className="mt-1.5 truncate text-2xl font-bold tracking-tight text-ink">
+          <p className="mt-1.5 truncate text-2xl font-bold tracking-tight text-ink tabular-nums">
             {display}
           </p>
         </div>

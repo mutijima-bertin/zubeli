@@ -9,6 +9,7 @@ import {
   Table,
   cx,
 } from "@/components/ui";
+import { SortableDataTable } from "./SortableDataTable";
 
 export type DataTableColumn<T> = {
   /** Stable key — also the default cell accessor when `render` is omitted. */
@@ -18,6 +19,20 @@ export type DataTableColumn<T> = {
   className?: string;
   /** Custom cell renderer. Default: stringifies `row[key]` ("—" when null). */
   render?: (row: T) => ReactNode;
+  /**
+   * Enable client-side click-to-sort on this header (asc first, then
+   * toggles). Purely client state — no server action or URL changes.
+   * NOTE: the consuming screen must be a client component ("use client"):
+   * when any column is sortable the table renders through a client
+   * widget, so render/rowKey functions must not cross a server boundary.
+   */
+  sortable?: boolean;
+  /**
+   * Sort key override for the column. Default reads the same `row[key]`
+   * accessor as the cell — use this for formatted/derived columns (e.g.
+   * sort by the raw timestamp, not the rendered date label).
+   */
+  sortValue?: (row: T) => string | number;
 };
 
 export type DataTableProps<T> = {
@@ -69,8 +84,21 @@ export type DataTableProps<T> = {
  *
  * Screens keep ALL data fetching in their own components and pass plain
  * data — no logic lives here.
+ *
+ * Optional per-column client-side sorting (`sortable: true`): the widget
+ * transparently delegates to a client twin (SortableDataTable) that adds
+ * sort buttons, `aria-sort` and a stable sort — the public props stay the
+ * same, and screens with no sortable columns keep the exact same server
+ * markup (no client boundary).
  */
-export function DataTable<T>({
+export function DataTable<T>(props: DataTableProps<T>) {
+  if (props.columns.some((col) => col.sortable)) {
+    return <SortableDataTable {...props} />;
+  }
+  return <DataTableCore {...props} />;
+}
+
+function DataTableCore<T>({
   columns,
   data,
   rowKey,

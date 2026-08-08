@@ -22,7 +22,7 @@ export function CartBadge({ className }: { className?: string }) {
     >
       <IconCart className="size-6" />
       {itemCount > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-700 px-1 text-[11px] font-bold text-white">
+        <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-700 px-1 text-xs font-bold text-white">
           {itemCount}
         </span>
       )}

@@ -169,14 +169,18 @@ export function CheckoutFlow({
   }
 
   // Provider still hydrating (guest first visit / refresh in flight).
+  // Skeletons mirror the real DOM order below: summary card first (top on
+  // mobile; right-hand rail on lg+), then the form blocks.
   if (!cart) {
     return (
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]" aria-hidden="true">
-        <div className="space-y-6">
+        <div className="min-w-0 lg:order-last">
+          <Skeleton className="h-72 w-full" />
+        </div>
+        <div className="min-w-0 space-y-6">
           <Skeleton className="h-72 w-full" />
           <Skeleton className="h-56 w-full" />
         </div>
-        <Skeleton className="h-72 w-full" />
       </div>
     );
   }
@@ -200,6 +204,19 @@ export function CheckoutFlow({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/*
+       * Mobile-first order (audit #12): the summary comes FIRST in the DOM so
+       * on <lg screens it appears above the form and the reading/focus order
+       * matches the visual order. On lg+ the aside drops back to the right
+       * rail (lg:order-last) and the form takes the left column — desktop
+       * layout is unchanged. One summary instance only — no duplication.
+       */}
+      <aside className="min-w-0 lg:order-last">
+        <div className="space-y-4 lg:sticky lg:top-6">
+          <OrderSummaryPanel />
+        </div>
+      </aside>
+
       <div className="min-w-0 space-y-6">
         {pageError && (
           <Alert tone="danger" title="We couldn't place your order">
@@ -227,12 +244,6 @@ export function CheckoutFlow({
 
         <PlaceOrderButton pending={isPending} />
       </div>
-
-      <aside className="min-w-0">
-        <div className="space-y-4 lg:sticky lg:top-6">
-          <OrderSummaryPanel />
-        </div>
-      </aside>
     </form>
   );
 }

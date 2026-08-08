@@ -31,6 +31,9 @@ export function Price({
   return (
     <span
       className={cx(
+        // tabular-nums: RWF figures align and don't jitter as digits change
+        // (ui-ux-pro-max audit #5 — typography#number-tabular).
+        "tabular-nums",
         sizeClasses[size],
         strike && "text-stone-400 line-through",
         className,

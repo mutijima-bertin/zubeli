@@ -7,7 +7,8 @@ export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "dan
 export type ButtonSize = "sm" | "md" | "lg";
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-brand-700 text-white hover:bg-brand-800 active:bg-brand-900",
+  // Safety-orange CTA: ink-dark on cta-600 = 5.4:1 (AA). Never white on orange.
+  primary: "bg-cta-600 text-ink-dark hover:bg-cta-700 active:bg-cta-800",
   secondary: "bg-ink-light text-white hover:bg-ink active:bg-ink-dark",
   outline: "border border-stone-300 bg-white text-ink hover:bg-stone-50 active:bg-stone-100",
   ghost: "text-ink hover:bg-stone-100 active:bg-stone-200",

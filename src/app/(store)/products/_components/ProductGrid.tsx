@@ -11,13 +11,13 @@ import { PaginationBar } from "./PaginationBar";
  * truth; this component only caches server-rendered pages so "load more"
  * can accumulate without re-fetching or client-side data duplication:
  *
- * - A cache keyed by `q|cat|sort|cursor` maps each applied cursor to the
- *   accumulated list that was shown at that point. Back/forward navigation
- *   restores the exact list (no duplicates).
+ * - A cache keyed by `q|cat|sort|price|avail|cursor` maps each applied cursor
+ *   to the accumulated list that was shown at that point. Back/forward
+ *   navigation restores the exact list (no duplicates).
  * - When a new cursor arrives that was never seen (advance), the fresh
  *   server page is appended to the accumulated items.
- * - When `q`/`cat`/`sort` change (or a link carries no cursor), the list is
- *   reset to the incoming server page.
+ * - When any filter changes (q/cat/sort/minPrice/maxPrice/avail — or a link
+ *   carries no cursor), the list is reset to the incoming server page.
  *
  * Grid renders shared ProductCard (no actions slot — add-to-cart lives on
  * the product page and cart, per build plan).
@@ -35,8 +35,11 @@ export function ProductGrid({
   const q = searchParams.get("q") ?? "";
   const cat = searchParams.get("cat") ?? "";
   const sort = searchParams.get("sort") ?? "";
+  const minPrice = searchParams.get("minPrice") ?? "";
+  const maxPrice = searchParams.get("maxPrice") ?? "";
+  const avail = searchParams.get("avail") ?? "";
   const cursor = searchParams.get("cursor") ?? null;
-  const base = `${q}|${cat}|${sort}`;
+  const base = `${q}|${cat}|${sort}|${minPrice}|${maxPrice}|${avail}`;
   const key = `${base}|${cursor ?? ""}`;
 
   const [items, setItems] = useState<ProductCardDTO[]>(initialItems);

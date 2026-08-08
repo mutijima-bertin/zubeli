@@ -484,7 +484,7 @@ export function ProductForm({
                   >
                     <IconX className="size-4" />
                   </button>
-                  <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
+                  <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded bg-white/90 px-1.5 py-0.5 text-xs font-medium text-stone-600">
                     {index + 1}
                   </span>
                 </li>

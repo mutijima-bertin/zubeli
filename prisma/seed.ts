@@ -56,13 +56,15 @@ type ProductSpec = {
   featured?: boolean;
   isPublished?: boolean;
   image?: boolean; // has a placeholder SVG in public/images/products/
+  photo?: boolean; // has a real photo in public/images/products/stock/
+  photoFiles?: string[]; // photo file names (relative to stock/) when set differs from [`<slug>.jpg`]
 };
 
 const products: ProductSpec[] = [
   // Power Tools
-  { slug: 'power-drill', name: 'Power Drill 13mm', categorySlug: 'power-tools', priceCents: 85000, initialStock: 12, featured: true, image: true,
+  { slug: 'power-drill', name: 'Power Drill 13mm', categorySlug: 'power-tools', priceCents: 85000, initialStock: 12, featured: true, photo: true,
     description: 'A 13mm chuck power drill with variable speed, ideal for masonry, wood and steel on Rwandan job sites. Comes with a side handle and a carry case so you can work all day comfortably.' },
-  { slug: 'angle-grinder', name: 'Angle Grinder 125mm', categorySlug: 'power-tools', priceCents: 65000, initialStock: 8, featured: true, image: true,
+  { slug: 'angle-grinder', name: 'Angle Grinder 125mm', categorySlug: 'power-tools', priceCents: 65000, initialStock: 8, featured: true, photo: true,
     description: 'A 125mm angle grinder for cutting and grinding metal, tile and concrete. Slim body for a firm grip and a lock-on switch for longer cutting runs.' },
   { slug: 'circular-saw', name: 'Circular Saw 185mm', categorySlug: 'power-tools', priceCents: 125000, initialStock: 6, image: true,
     description: 'A 185mm circular saw with a laser guide for straight, accurate cuts in timber and sheet materials. Great for framing and site carpentry.' },
@@ -71,23 +73,24 @@ const products: ProductSpec[] = [
   // Hand Tools
   { slug: 'claw-hammer', name: 'Claw Hammer 500g', categorySlug: 'hand-tools', priceCents: 12500, initialStock: 30, featured: true, image: true,
     description: 'A 500g forged-steel claw hammer with a shock-absorbing handle. The right balance for driving and pulling nails all day without tiring your wrist.' },
-  { slug: 'adjustable-wrench', name: 'Adjustable Wrench 250mm', categorySlug: 'hand-tools', priceCents: 9800, initialStock: 25,
+  { slug: 'adjustable-wrench', name: 'Adjustable Wrench 250mm', categorySlug: 'hand-tools', priceCents: 9800, initialStock: 25, photo: true,
     description: 'A 250mm adjustable wrench with a smooth 30mm jaw. One tool handles many nut and bolt sizes — a must for plumbing and equipment repairs.' },
-  { slug: 'screwdriver-set', name: 'Screwdriver Set (8-piece)', categorySlug: 'hand-tools', priceCents: 15000, initialStock: 18, image: true,
+  { slug: 'screwdriver-set', name: 'Screwdriver Set (8-piece)', categorySlug: 'hand-tools', priceCents: 15000, initialStock: 18, photo: true,
     description: 'Eight flat and Phillips screwdrivers with magnetic tips and comfortable grips. Covers the sizes used on almost every assembly job.' },
   // Safety Gear
-  { slug: 'safety-helmet', name: 'Safety Helmet', categorySlug: 'safety-gear', priceCents: 4500, initialStock: 60, featured: true, image: true,
+  { slug: 'safety-helmet', name: 'Safety Helmet', categorySlug: 'safety-gear', priceCents: 4500, initialStock: 60, photo: true,
     description: 'A lightweight industrial safety helmet with an adjustable strap and sweatband. Certified for construction sites and comfortable in the sun.' },
-  { slug: 'safety-gloves', name: 'Work Gloves (pair)', categorySlug: 'safety-gear', priceCents: 3500, initialStock: 80,
+  { slug: 'safety-gloves', name: 'Work Gloves (pair)', categorySlug: 'safety-gear', priceCents: 3500, initialStock: 80, photo: true,
     description: 'Reinforced work gloves with a grippy palm. Protect your hands from cuts, blisters and heat while handling tools and materials.' },
-  { slug: 'safety-goggles', name: 'Safety Goggles', categorySlug: 'safety-gear', priceCents: 4000, initialStock: 45,
+  { slug: 'safety-goggles', name: 'Safety Goggles', categorySlug: 'safety-gear', priceCents: 4000, initialStock: 45, photo: true,
     description: 'Impact-resistant safety goggles with anti-fog coating. Keep dust and debris out of your eyes when cutting, grinding or mixing.' },
-  { slug: 'safety-vest', name: 'Hi-Vis Safety Vest', categorySlug: 'safety-gear', priceCents: 6500, initialStock: 0,
+  { slug: 'safety-vest', name: 'Hi-Vis Safety Vest', categorySlug: 'safety-gear', priceCents: 6500, initialStock: 0, photo: true,
     description: 'A high-visibility mesh vest with reflective stripes. Be clearly seen by vehicles and machinery on site. Currently out of stock.' },
   // Construction Materials
-  { slug: 'cement-50kg', name: 'Cement 50kg', categorySlug: 'construction-materials', priceCents: 9800, initialStock: 200, featured: true, image: true,
+  { slug: 'cement-50kg', name: 'Cement 50kg', categorySlug: 'construction-materials', priceCents: 9800, initialStock: 200, featured: true, photo: true,
+    photoFiles: ['cement-50kg.jpg', 'cement-bag.jpg'],
     description: 'A 50kg bag of general-purpose Portland cement. Consistent quality for slabs, blocks and plaster — the backbone of any build.' },
-  { slug: 'wheelbarrow', name: 'Wheelbarrow 100L', categorySlug: 'construction-materials', priceCents: 48000, initialStock: 14, featured: true, image: true,
+  { slug: 'wheelbarrow', name: 'Wheelbarrow 100L', categorySlug: 'site-equipment', priceCents: 48000, initialStock: 14, image: true,
     description: 'A 100L heavy-duty wheelbarrow with a pneumatic tyre and sturdy steel tray. Moves concrete, sand and rubble without slowing you down.' },
   { slug: 'hollow-block', name: 'Hollow Block (per 100)', categorySlug: 'construction-materials', priceCents: 45000, initialStock: 90,
     description: 'A pack of 100 standard 6-inch hollow concrete blocks. Uniform size and strength for fast, even wall construction.' },
@@ -103,7 +106,7 @@ const products: ProductSpec[] = [
   { slug: 'hex-bolts', name: 'Hex Bolts M8 (box)', categorySlug: 'fasteners-fixings', priceCents: 9000, initialStock: 48,
     description: 'A box of 50 M8 zinc-plated hex bolts with nuts. Strong, corrosion-resistant fixings for steel and timber connections.' },
   // Measuring & Layout
-  { slug: 'measuring-tape', name: 'Measuring Tape 5m', categorySlug: 'measuring-layout', priceCents: 3200, initialStock: 40, featured: true, image: true,
+  { slug: 'measuring-tape', name: 'Measuring Tape 5m', categorySlug: 'measuring-layout', priceCents: 3200, initialStock: 40, photo: true,
     description: 'A 5m locking tape measure with a durable blade and belt clip. Clear markings make every cut and layout quick to check.' },
   { slug: 'spirit-level', name: 'Spirit Level 1m', categorySlug: 'measuring-layout', priceCents: 14500, initialStock: 26,
     description: 'A 1m aluminium spirit level with three vials. Check walls, frames and shelves are perfectly true, horizontal and vertical.' },
@@ -129,6 +132,34 @@ const products: ProductSpec[] = [
     description: 'A 5m aluminium extension ladder with slip-resistant rungs and locking catches. Reaches upper floors safely and stays steady.' },
   { slug: 'concrete-mixer', name: 'Concrete Mixer 160L', categorySlug: 'site-equipment', priceCents: 385000, initialStock: 2, image: true,
     description: 'A 160L electric concrete mixer with a steel drum. Mix consistent concrete on site in minutes instead of by hand.' },
+  // ---- Real-photo catalog additions (2026-08-08) — photos live in
+  // public/images/products/stock/<slug>.jpg ----
+  { slug: 'rhinoceros-bow-saw', name: 'Rhinoceros Bow Saw', categorySlug: 'hand-tools', priceCents: 7500, initialStock: 20, photo: true,
+    description: 'A Rhinoceros bow saw that cuts timber, branches and PVC pipe quickly and cleanly. Tough frame with a comfortable grip — a real site favourite.' },
+  { slug: 'shovel', name: 'Shovel', categorySlug: 'site-equipment', priceCents: 8500, initialStock: 40, photo: true,
+    description: 'A steel-blade shovel for digging, mixing mortar and moving materials. Hardened edge stays sharp through heavy site work.' },
+  { slug: 'safety-boots', name: 'Safety Boots', categorySlug: 'safety-gear', priceCents: 18000, initialStock: 30, photo: true,
+    description: 'Rugged safety boots with a steel toe cap and slip-resistant sole. Protect your feet from falling loads and sharp ground all day.' },
+  { slug: 'hand-saw', name: 'Hand Saw 14in', categorySlug: 'hand-tools', priceCents: 9000, initialStock: 35, photo: true,
+    description: 'A 14-inch hand saw with hardened teeth for fast, clean cross-cuts in timber and board. Comfortable grip for long cutting sessions.' },
+  { slug: 'wash-basin', name: 'Wash Basin', categorySlug: 'plumbing', priceCents: 38000, initialStock: 25, photo: true,
+    description: 'A durable wash basin in a clean white finish. Easy to install and wipe down — a solid fit for homes and site facilities alike.' },
+  { slug: 'bench-plane', name: 'Bench Plane', categorySlug: 'hand-tools', priceCents: 24000, initialStock: 25, photo: true,
+    description: 'A bench plane that trims doors, edges and joints to a smooth finish. Set the blade once and keep planing all day.' },
+  { slug: 'hedge-shears', name: 'Hedge Shears 52cm', categorySlug: 'hand-tools', priceCents: 13500, initialStock: 30, photo: true,
+    description: '52cm hedge shears with sharpened blades and soft-grip handles. Trim hedges, bushes and overgrowth quickly and evenly.' },
+  { slug: 'paint-sprayer', name: 'Paint Sprayer', categorySlug: 'painting-finishing', priceCents: 75000, initialStock: 20, photo: true,
+    description: 'An electric paint sprayer that puts a smooth, even coat on walls and fences in a fraction of the time. Adjustable flow for any paint.' },
+  // ---- Photo batch 2 (2026-08-08) — real photos, benefit-led copy ----
+  { slug: 'chainsaw', name: 'Chainsaw', categorySlug: 'power-tools', priceCents: 185000, initialStock: 10, photo: true,
+    description: 'A powerful chainsaw for felling timber, cutting firewood and clearing branches. Anti-vibration handles and automatic chain oiling keep long cutting sessions comfortable.' },
+  { slug: 'pressure-washer', name: 'Pressure Washer', categorySlug: 'site-equipment', priceCents: 250000, initialStock: 8, photo: true,
+    description: 'A high-pressure washer that blasts mud, paint and grime off machines, walls and floors. The quick way to keep tools and equipment site-ready.' },
+  { slug: 'garden-hoe', name: 'Garden Hoe', categorySlug: 'hand-tools', priceCents: 5000, initialStock: 50, photo: true,
+    description: 'A garden hoe with a sharp tempered-steel blade for weeding, digging and breaking up soil. Firmly fixed to a strong handle for comfortable all-day work.' },
+  { slug: 'pruning-shears', name: 'Pruning Shears', categorySlug: 'hand-tools', priceCents: 9500, initialStock: 35, photo: true,
+    photoFiles: ['pruning-shears.jpg', 'pruning-shears-2.jpg'],
+    description: 'Sharp pruning shears that cut branches and stems cleanly so plants stay healthy. Comfortable grip and a safety catch fold them away when not in use.' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -263,6 +294,14 @@ async function main() {
   for (const p of products) {
     const categoryId = categoryBySlug.get(p.categorySlug);
     if (!categoryId) throw new Error(`Seed: missing category ${p.categorySlug}`);
+    // Real photos (public/images/products/stock/) take precedence over
+    // placeholder SVGs; imageUrls stay stable across runs so reseeds converge.
+    // First entry is the hero image (gallery order).
+    const imageUrls = p.photo
+      ? (p.photoFiles ?? [`${p.slug}.jpg`]).map((f) => `/images/products/stock/${f}`)
+      : p.image
+        ? [`/images/products/${p.slug}.svg`]
+        : [];
     const row = await prisma.product.upsert({
       where: { slug: p.slug },
       update: {
@@ -273,13 +312,14 @@ async function main() {
         lowStockThreshold: 5,
         isPublished: p.isPublished ?? true,
         featured: p.featured ?? false,
+        imageUrls,
         categoryId,
       },
       create: {
         slug: p.slug,
         name: p.name,
         description: p.description,
-        imageUrls: p.image ? [`/images/products/${p.slug}.svg`] : [],
+        imageUrls,
         priceCents: p.priceCents,
         stockQty: p.initialStock,
         lowStockThreshold: 5,

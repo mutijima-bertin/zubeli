@@ -100,3 +100,31 @@ export function IconStore(props: IconProps) {
     </Icon>
   );
 }
+
+/** Chevron up — ascending sort caret (mirrors the design-system chevron). */
+export function IconChevronUp(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m6 15 6-6 6 6" />
+    </Icon>
+  );
+}
+
+/** Chevron down — descending sort caret (mirrors the design-system chevron). */
+export function IconChevronDown(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Icon>
+  );
+}
+
+/** Chevrons up/down — "sortable, not sorted yet" affordance. */
+export function IconSort(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m7 15 5 5 5-5" />
+      <path d="m7 9 5-5 5 5" />
+    </Icon>
+  );
+}

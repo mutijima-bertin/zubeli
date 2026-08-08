@@ -1,0 +1,9 @@
+# 2026-08-08 — docs-writer — index catch-up
+
+- What was done: cross-checked `docs/reports/README.md` against all 57 report files on disk (scan, no guessing); index had 16 rows — added **41 missing one-line entries** and cleaned the runner pro-max row's "pending file" note (report has landed).
+- Entries added (41): 2026-08-06 (5): planner-storefront-plan, frontend-agent-foundation, runner-foundation-checkpoint, tdd-guide-vitest-fix, docs-writer-reports-index.
+- 2026-08-07 (26): frontend-agent-contrast-fix, quality-agent-foundation-gate, runner-homepage-checkpoint, cart/catalog/product-page/checkout/account screen reports, backend-agent-checkout-order-action, tdd-guide-account-fixture-fix + storefront-integration, runner-storefront-checkpoint, quality-agent-storefront-gate, catalog/product-page/account gate-fixes, e2e-runner-milestone4, account-agent-e2e-bug-fix, runner-checkpoint4, dashboard-agent-shell, inventory/stock/orders/customers/sales screen reports, runner-dashboard-checkpoint.
+- 2026-08-08 (10): runner-stress-checkpoint, docs-writer-status, backend-agent-upload-api, database-agent-second-admin, inventory-agent-drag-drop-images, frontend-agent-quick-add, dashboard-agent-force-dynamic, account-agent-owner-login-landing, docs-writer-pro-max-status, build-error-resolver-lint-reference-ignore.
+- Files touched: `docs/reports/README.md` (only) — table 16 → 57 rows; 3 typos fixed (Greek kappa in BANK_TRANSFER, 13-vs-22 routes miscount, garbled pro-max note).
+- Verification: derived scan — every report on disk referenced, no invented entries; 57 data rows = 57 report files; no gaps.
+- Next steps: none — index in sync with disk.

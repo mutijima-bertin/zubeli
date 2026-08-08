@@ -22,6 +22,21 @@ const config: Config = {
           800: "#92400e",
           900: "#78350f",
         },
+        // CTA — safety orange (construction site). Primary actions only;
+        // ink-dark text on cta-600 = 5.4:1 (AA). White-on-cta-600 is 3.1:1 —
+        // do NOT use white text on orange. Per ui-ux-pro-max audit #1.
+        cta: {
+          50: "#fff7ed",
+          100: "#ffedd5",
+          200: "#fed7aa",
+          300: "#fdba74",
+          400: "#fb923c",
+          500: "#f97316",
+          600: "#ea580c",
+          700: "#c2410c",
+          800: "#9a3412",
+          900: "#7c2d12",
+        },
         // Dark neutral base (charcoal, construction-site steel)
         ink: {
           DEFAULT: "#1c1917",

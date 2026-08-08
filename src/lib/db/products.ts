@@ -4,15 +4,18 @@
  */
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
+import { catalogWhere, type CatalogSearchParams } from './catalog';
 import { idCursor, normalizeLimit, toPage, type Page, type PageParams } from './pagination';
+import type { ProductSort } from '@/types/api';
 
-export type ProductSort = 'newest' | 'price-asc' | 'price-desc' | 'featured';
+// Canonical definition lives in src/types/api.ts (client-safe contract);
+// re-exported here so existing imports from the db layer keep working.
+export type { ProductSort } from '@/types/api';
 
-export type ListPublishedParams = PageParams & {
-  categorySlug?: string;
-  search?: string;
-  sort?: ProductSort;
-};
+export type ListPublishedParams = PageParams &
+  CatalogSearchParams & {
+    sort?: ProductSort;
+  };
 
 /** Shape shared by storefront product cards (catalog, featured, search). */
 const productCardSelect = {
@@ -34,6 +37,9 @@ export type ProductCard = Prisma.ProductGetPayload<{ select: typeof productCardS
 export async function listPublished({
   categorySlug,
   search,
+  minPriceCents,
+  maxPriceCents,
+  stock,
   sort = 'newest',
   cursor,
   limit,
@@ -42,15 +48,7 @@ export async function listPublished({
   const where: Prisma.ProductWhereInput = {
     isPublished: true,
     deletedAt: null,
-    ...(categorySlug ? { category: { slug: categorySlug } } : {}),
-    ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
-          ],
-        }
-      : {}),
+    ...catalogWhere({ categorySlug, search, minPriceCents, maxPriceCents, stock }),
   };
 
   const orderBy: Prisma.ProductOrderByWithRelationInput[] =

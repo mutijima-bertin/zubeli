@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopBar } from "@/components/admin/AdminTopBar";
+import { ToastProvider } from "@/components/ui";
 
 export const metadata = {
   title: "Admin | Zubeli",
@@ -21,6 +22,10 @@ export const dynamic = "force-dynamic";
  * /login and non-OWNERs to /; this server layout re-verifies the session
  * (a non-owner can never render the shell even if middleware is bypassed).
  * Real enforcement still lives in every admin action (`requireAdminOrThrow`).
+ *
+ * Toast parity (ui-ux-pro-max audit #15b): the storefront ToastProvider is
+ * mounted here so any admin client component can use `useToast()` — the
+ * storefront widget itself is owned by frontend-agent and is not edited.
  */
 export default async function AdminLayout({
   children,
@@ -33,14 +38,16 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-dvh bg-stone-50 text-ink">
-      <AdminSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopBar user={user} />
-        <main id="main" className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          {children}
-        </main>
+    <ToastProvider>
+      <div className="flex min-h-dvh bg-stone-50 text-ink">
+        <AdminSidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <AdminTopBar user={user} />
+          <main id="main" className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   );
 }

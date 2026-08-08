@@ -1,0 +1,8 @@
+# 2026-08-08 — docs-writer — commerce status (index + AGENTS.md)
+
+- What was done: indexed the commerce-polish wave and added its status line to AGENTS.md.
+- `docs/reports/README.md` — appended 6 rows after `runner/pro-max-checkpoint`: `backend-agent/catalog-filters`, `database-agent/real-photos-seed`, `frontend-agent/card-polish`, `product-page-agent/trust-strip`, `catalog-agent/price-avail`, `runner/commerce-checkpoint`. All five agent reports verified on disk before writing; the runner checkpoint file is NOT on disk yet — row added per instruction, link resolves when it lands.
+- `AGENTS.md` — one new bullet under "Current status", inserted between the Pro-max design pass line and "Open work": "Commerce polish (2026-08-08) …" per instruction; runner report reference + "reports index updated" appended to match the style of the pro-max line. "What remains" untouched — no backlog item completed by this wave.
+- Facts checked against disk: 16 photos in `public/images/products/stock/` (16 `photo: true` seed rows — 8 existing + 8 new, incl. rhinoceros-bow-saw RWF 7,500); vitest 282/282 (16 files) from the backend report; no numbers invented.
+- Verification: re-read both edited files — index table well-formed (102 lines), status bullet in place, other sections untouched.
+- Next steps: when the runner's commerce-checkpoint report lands, confirm its numbers match the index/status phrasing (one-line follow-up update if they differ).

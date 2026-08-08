@@ -58,6 +58,9 @@ export type Page<T> = {
 // ---------------------------------------------------------------------------
 
 export type Role = 'CUSTOMER' | 'OWNER';
+export type ProductSort = 'newest' | 'price-asc' | 'price-desc' | 'featured';
+/** Storefront availability filter — derives from `stockQty`: in > 0, low 1–5, out = 0. */
+export type AvailabilityFilter = 'in' | 'low' | 'out';
 export type OrderStatus = 'PENDING' | 'PAID' | 'FULFILLED' | 'CANCELLED' | 'REFUNDED';
 export type PaymentMethod =
   | 'COD_CASH'
@@ -85,6 +88,22 @@ export type CategoryDTO = {
   id: string;
   slug: string;
   name: string;
+};
+
+/**
+ * Applied catalog filters — echoed by getCatalogPage (src/lib/storefront.ts)
+ * so screens rebuild links with additive filtering: q/cat/sort/minPrice/
+ * maxPrice/avail all travel together (a category chip keeps the price range
+ * and availability, and resets the cursor).
+ */
+export type CatalogFilter = {
+  q: string | null;
+  cat: string | null;
+  sort: ProductSort;
+  /** Price bounds in RWF units (user-facing ints); null = not applied. */
+  minPrice: number | null;
+  maxPrice: number | null;
+  avail: AvailabilityFilter | null;
 };
 
 export type ProductDTO = {

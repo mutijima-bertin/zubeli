@@ -17,6 +17,9 @@ type CatalogSearchParams = {
   cat?: string | string[];
   sort?: string | string[];
   cursor?: string | string[];
+  minPrice?: string | string[];
+  maxPrice?: string | string[];
+  avail?: string | string[];
 };
 
 /** Search params may be repeated (?q=a&q=b) — take the first value. */
@@ -51,13 +54,18 @@ export default async function CatalogPage({
   const cat = firstParam(params.cat) || undefined;
   const sort = firstParam(params.sort) || undefined;
   const cursor = firstParam(params.cursor) || undefined;
+  const minPrice = firstParam(params.minPrice) || undefined;
+  const maxPrice = firstParam(params.maxPrice) || undefined;
+  const avail = firstParam(params.avail) || undefined;
 
-  const data = await getCatalogPage({ q, cat, sort, cursor });
+  const data = await getCatalogPage({ q, cat, sort, cursor, minPrice, maxPrice, avail });
 
   const { items, nextCursor, hasMore } = data.page;
   const applied = data.filter;
   const activeCategory =
     data.categories.find((category) => category.slug === applied.cat) ?? null;
+  const hasFiltered =
+    applied.minPrice !== null || applied.maxPrice !== null || applied.avail !== null;
 
   const heading = activeCategory ? activeCategory.name : q ? "Search results" : "All tools";
   const subtitle = activeCategory
@@ -68,14 +76,20 @@ export default async function CatalogPage({
       ? `Tools matching “${q}” — order online and pay on delivery.`
       : "Construction tools, materials and safety gear in Rwanda — order online and pay on delivery.";
 
-  const emptyTitle = q ? "No tools match your search" : "No tools in this category yet";
+  const emptyTitle = q
+    ? "No tools match your search"
+    : hasFiltered
+      ? "No tools match your filters"
+      : "No tools in this category yet";
   const emptyDescription = q
     ? activeCategory
       ? `We couldn't find any products matching “${q}” in ${activeCategory.name}. Check the spelling or browse the full catalog.`
       : `We couldn't find any products matching “${q}”. Check the spelling or browse the full catalog.`
-    : activeCategory
-      ? "This category is being restocked — check back soon or browse the full catalog."
-      : "The catalog is being stocked — check back soon.";
+    : hasFiltered
+      ? "No products match the selected price or availability. Widen the range or browse the full catalog."
+      : activeCategory
+        ? "This category is being restocked — check back soon or browse the full catalog."
+        : "The catalog is being stocked — check back soon.";
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
@@ -90,6 +104,9 @@ export default async function CatalogPage({
           activeCat={applied.cat}
           q={applied.q}
           sort={applied.sort}
+          minPrice={applied.minPrice}
+          maxPrice={applied.maxPrice}
+          avail={applied.avail}
         />
 
         <section aria-labelledby="results-heading" className="mt-6 lg:mt-0">

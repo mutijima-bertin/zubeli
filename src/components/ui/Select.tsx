@@ -16,7 +16,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         ref={ref}
         aria-invalid={invalid || undefined}
         className={cx(
-          "block w-full appearance-none rounded-lg border bg-white py-2.5 pl-3 pr-9 text-sm text-ink transition-colors focus:outline-none focus:ring-2",
+          "block min-h-11 w-full appearance-none rounded-lg border bg-white py-2 pl-3 pr-9 text-sm text-ink transition-colors focus:outline-none focus:ring-2",
           invalid
             ? "border-danger-500 focus:border-danger-600 focus:ring-danger-100"
             : "border-stone-300 focus:border-brand-600 focus:ring-brand-100",
