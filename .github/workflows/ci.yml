@@ -1,0 +1,163 @@
+# =============================================================================
+# Zubeli — CI pipeline (LOCAL file; becomes live ONLY when this repo is pushed
+# to a GitHub remote with user approval — never before)
+# -----------------------------------------------------------------------------
+# Runs on every push / pull request touching `main` (non-fork PRs get
+# secrets; fork-preview PRs get the documented fallbacks below).
+#
+# One job, one linear verification chain mirroring the local workflow
+# (docs/RUNBOOK.md + runner checkpoints):
+#
+#   npm ci -> prisma generate -> lint -> tsc --noEmit -> vitest -> next build
+#     -> playwright e2e (against a Postgres 16 service container = test DB)
+#
+# Database: a single postgres:16-alpine service container. User/pass/db match
+# docker-compose.yml's `zubeli-postgres-test` exactly, and host port 5435 is
+# the SAME port contract as local docker, so the TEST_DATABASE_URL default
+# below agrees with the playwright config with zero code changes.
+#
+# The e2e GLOBAL SETUP (e2e/global-setup.ts) is authoritative for the test
+# DB: it runs `prisma migrate reset --skip-seed` + `prisma db seed` once per
+# run. No migrate/seed step is therefore needed in this workflow.
+#
+# Secrets & env vars used by CI (all others, incl. NEXT_PUBLIC_*, have safe
+# code defaults — see .env.example):
+#   - SESSION_SECRET — the ONLY secret. Referenced with a deterministic
+#     non-secret fallback because GitHub never passes secrets to fork PRs.
+#     NOTE: the app currently does NOT read it (sessions are DB-backed,
+#     ADR 0002; the quality gate listed this as dead env). It is reserved so
+#     CI keeps working if cookie signing is reintroduced. Set repo secret
+#     `SESSION_SECRET` (openssl rand -hex 32) to override the fallback.
+#   - DATABASE_URL / TEST_DATABASE_URL — CI postgres service (5435), no secret.
+#
+# Deploy is NOT automatic: this pipeline only verifies (lint/type/test/build).
+# Image build + push + deploy happen via documented manual steps at the
+# hosting milestone (see AGENTS.md "What remains").
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  verify:
+    name: lint · typecheck · unit · build · e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # All CI database traffic hits the postgres service container below.
+      # Same values as local .env.example's DATABASE_URL/TEST_DATABASE_URL
+      # but pointed at the ephemeral CI postgres (host port 5435).
+      DATABASE_URL: postgresql://zubeli:zubeli@localhost:5435/zubeli_test
+      TEST_DATABASE_URL: postgresql://zubeli:zubeli@localhost:5435/zubeli_test
+      # Reserved var (see header comment). Secret-with-fallback:
+      #   - same-repo PRs / main pushes -> secrets.SESSION_SECRET when set
+      #   - fork PRs / no secret configured -> deterministic placeholder
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET || '0000000000000000000000000000000000000000000000000000000000000000' }}
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: zubeli
+          POSTGRES_PASSWORD: zubeli
+          POSTGRES_DB: zubeli_test
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd "pg_isready -U zubeli"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22 (npm cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies (locked)
+        run: npm ci
+        timeout-minutes: 10
+
+      # Prisma client must exist before tsc (types), seed (e2e global setup)
+      # and build. No postinstall hook generates it.
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright chromium (+ system deps)
+        run: npx playwright install --with-deps chromium
+
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          # Lockfile-only key: Next cache survives when only source changes;
+          # restore-keys keeps a warm cache across lockfile bumps.
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit & integration tests (Vitest)
+        run: npm test
+
+      # Offline-safe: the (store) layout reads cookies()/getSession, so every
+      # page renders dynamically — no DB-backed prerender at build time.
+      # DATABASE_URL is still provided above for parity with production builds.
+      - name: Production build
+        run: npm run build
+        timeout-minutes: 10
+
+      # global-setup resets + reseeds the test DB once, then the 11 specs /
+      # 29 tests run serial (workers: 1 by design — shared seeded fixture).
+      - name: E2E (Playwright vs fresh test DB)
+        run: npx playwright test
+        timeout-minutes: 15
+
+      - name: Upload Playwright report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Playwright traces (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

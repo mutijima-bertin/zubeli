@@ -24,6 +24,13 @@ npm-debug.log*
 # runtime user uploads (admin product images — never committed)
 /public/uploads/
 
+# python artifacts (compiled/coverage leftovers from vendored skill scripts in docs/reference/)
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+coverage-ui.json
+
 # misc
 .DS_Store
 *.tsbuildinfo

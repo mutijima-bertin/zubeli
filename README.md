@@ -29,6 +29,58 @@ First time? Also run `npm install`, then copy `cp .env.example .env.local` and r
 - Owner/admin: `owner@zubeli.rw` / `DemoPass2026!`
 - Customers: `umutoni@demo.rw` and `eric@demo.rw` (same demo password)
 
+## CI/CD
+
+When this repository is pushed to GitHub, every push/PR to `main` runs the
+pipeline in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Until
+then the workflow file is **local-only** — it becomes live only when the
+repo is pushed with explicit user approval.
+
+What CI runs, in order (one job `verify`):
+
+1. `npm ci` — locked install (Node 22, npm cache via setup-node)
+2. `npx prisma generate` — client types needed by typecheck/build/seed
+3. `npm run lint`
+4. `npx tsc --noEmit` — typecheck
+5. `npm test` — Vitest unit/integration suite
+6. `npm run build` — production build (offline-safe: pages render
+   dynamically, no DB-backed prerender)
+7. `npx playwright test` — e2e against a fresh Postgres 16 service
+   container on the same port contract as local (5435); the global setup
+   resets + reseeds the test DB once per run; Playwright browsers and the
+   Next.js build cache are cached between runs; report + traces upload on
+   failure.
+
+CI env vars / secrets (all documented in `.env.example`):
+
+| Variable | Source | Why |
+|---|---|---|
+| `DATABASE_URL` | workflow env (CI postgres) | app runtime + build parity |
+| `TEST_DATABASE_URL` | workflow env (CI postgres) | required by `playwright.config.ts` / global setup |
+| `SESSION_SECRET` | repo secret, **safe placeholder fallback for fork PRs** | reserved — the app uses DB-backed sessions (ADR 0002) and does not read it today |
+
+No other secrets exist. Set the `SESSION_SECRET` repo secret
+(`openssl rand -hex 32`) if you want the value pinned in CI; the workflow's
+deterministic fallback covers fork-preview PRs where GitHub hides secrets.
+
+Run the same checks locally against the local Postgres:
+
+```bash
+docker compose up -d                 # dev 5434 + test 5435
+cp .env.example .env.local           # then set SESSION_SECRET etc.
+npm ci
+npx prisma generate
+npm run lint
+npx tsc --noEmit
+npm test
+npm run build
+npx playwright test                  # resets + seeds the TEST DB itself
+```
+
+Deployment is **not** automatic: CI only verifies. Building/pushing
+container images and deploying to a host are documented manual steps done
+at the hosting milestone — never without explicit user approval.
+
 ## Repository map
 
 New to the repo? **[`docs/STRUCTURE.md`](docs/STRUCTURE.md)** is a one-page "where is what" map: backend (server actions + `src/lib` + `prisma`), frontend (`src/app` routes + `src/components`), shared code, tests, docs, and root config files.
