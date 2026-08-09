@@ -22,3 +22,9 @@
 - `git status`: `M .env.example, .gitignore, README.md` + 4 staged `D` (index-only) + `?? .github/`. Nothing committed, nothing pushed — push/remote creation waits for user approval.
 
 **Follow-up for docs-writer**: `docs/RUNBOOK.md:70,74` still says the app reads `SESSION_SECRET` — inaccurate since ADR 0002; suggest rewording.
+
+## CI FIX #1 (2026-08-09, run 31301078156 failed at Vitest)
+
+- **Root cause**: CI postgres service container starts with an EMPTY volume, but `tests/integration/actions.test.ts` assumes the schema exists (truncates tables in `beforeAll` via its own client on `TEST_DATABASE_URL`) → P2010/42P01 `relation "Payment" does not exist` → Vitest fails, build + e2e skipped. Local 5435 carried the schema for weeks so it never surfaced.
+- **Change**: `.github/workflows/ci.yml` — new step `Apply database migrations (migrate deploy)` right after "Generate Prisma client" (now step 5 of 15). `npx prisma migrate deploy` reads the job-env `DATABASE_URL` (already → `localhost:5435/zubeli_test`, same DB as `TEST_DATABASE_URL`); comment explains why deploy (non-destructive, idempotent) not reset/dev. e2e global-setup reset+seed untouched — no conflict (applied ≤ migrations).
+- **Expected effect**: CI postgres provisioned before Vitest; next run should pass lint → tsc → vitest → build → e2e (locally verified equivalents: lint 0, tsc 0, 258 passed/24 skipped). YAML re-validated via js-yaml (keys + 15 steps OK); no push — local-only until user approval.
