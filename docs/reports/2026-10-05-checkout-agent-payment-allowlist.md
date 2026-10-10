@@ -1,0 +1,13 @@
+# checkout-agent — configurable payment-method allowlist (2026-10-05)
+
+Checkout now offers only the server-configured subset (`siteConfig.paymentMethods` / `PAYMENT_METHODS` env); the owner can launch cash-on-delivery-only with no deploy.
+
+**Changed (3 files, all mine):** `page.tsx` (+`allowedMethods={siteConfig.paymentMethods}`, reusing the existing `siteConfig` import) · `PaymentMethodPicker.tsx` (new `allowedMethods` prop, exported pure helper `visiblePaymentOptions()` + `FALLBACK_PAYMENT_METHOD`, renders the filtered list, derives local `selected` so no radio is ever unchecked) · **`CheckoutFlow.tsx` — had to touch it**: it owns `value` + submit, so it is the only place that can stop the form submitting a now-disallowed method (accepts `allowedMethods`; derives `paymentMethod` = first visible option when state is stale; used for validate/submit/picker `value`/reference-error pruning).
+
+**Logic:** `catalogue ∩ allowlist` in catalogue order (cash first); missing/empty/unrenderable allowlist → `COD_CASH` only, never an empty step. `fieldset`/`legend`, `name="paymentMethod"`, MoMo hint, bank details + reference input, `errors.paymentMethod`, ring styling, option wording/icons all untouched. No `@/lib/site` in any client component; server action + zod untouched (backend-agent enforces).
+
+**Verification (verbatim):** `npx tsc --noEmit` → no output, 0 errors · `npm run lint` → `✖ 2 problems (0 errors, 2 warnings)` (both foreign files) · `npm test` → `Test Files 19 passed (19)`, `Tests 324 passed (324)` · `npm run build` → `✓ Compiled successfully in 37.4s`, route `├ ƒ /checkout 4.99 kB 125 kB`.
+
+**Live SSR smoke** (dev :3111, seeded guest cart): `COD_CASH` → only `name="paymentMethod" checked="" value="COD_CASH"`, zero "Bank transfer" copy · unset → all three, `COD_CASH` checked · `BANK_TRANSFER` (pre-select `COD_CASH` disallowed) → only `BANK_TRANSFER`, **checked**, reference input revealed. Smoke cart deleted from dev DB 5434.
+
+**Could not do / flags:** no tests written (brief forbids) — `visiblePaymentOptions` is covered only by the smoke above, so a unit test is worth adding later. Repeated suite runs drained the shared Postgres `register:` bucket (5/IP/hour) → transient `RATE_LIMITED` failures unrelated to this change; cleared test-DB buckets for the clean run. Reviewers: the stale-selection path in `CheckoutFlow`, and a cash-only e2e case (e2e/ is not mine).

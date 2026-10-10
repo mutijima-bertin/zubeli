@@ -1,0 +1,14 @@
+# 2026-08-09 — docs-writer — notifications status (index + AGENTS.md)
+
+- What was done: indexed the 2026-08-09 wave (UI + notifications + login fix) and refreshed `AGENTS.md` status/remains.
+- `docs/reports/README.md` — **+15 rows** for 2026-08-09 (all verified on disk first via glob; none missing): uiux-reviewer-landing-audit, frontend-agent-role-menu, database-agent-slug-partial-index, homepage-agent-landing-redesign, backend-agent-friendly-slug-errors, runner-checkpoint-ui-wave, database-agent-notifications-model, backend-agent-notifications-api, frontend-agent-notification-bell, dashboard-agent-statcard-cta, dashboard-agent-topbar-bell, sales-agent-overview-cta-cards, runner-checkpoint-notifications-wave, quality-agent-notifications-gate, account-agent-login-export-fix. Ordered as audit → UI wave → checkpoint → notifications wave → checkpoint → gate → fix.
+- Index gap closed: glob cross-check found **5 pre-existing 2026-08-08 reports on disk that were never indexed** — database-agent-photo-batch2, docs-writer-index-catchup, docs-writer-commerce-status, runner-final-precommit-checkpoint, devops-agent-ci-cd-prep (incl. its CI FIX #1 section). Added them in the 08-08 block before runner/commerce-checkpoint. Index now covers every report file on disk.
+- `AGENTS.md` — 8 edits: header date → 2026-08-09; "Current status" — first bullet updated to the private GitHub remote (origin exists since 2026-08-09, pushed with user approval; "no remote" claims in Decided(08-06), Publishing guardrail, and the checked repo item were stale) + 4 new bullets (UI wave DONE w/ checkpoint numbers, notifications feature DONE w/ checkpoint numbers, notifications gate PASS-WITH-BACKLOG w/ new L1–L6, login Page-export fix) + "Open work" rewritten into "Open work / asks for the user" (dev DB 5434 restore decision, wave uncommitted, turbopack flakiness, backlog sweep). "What remains" — backlog line extended with notifications L1–L6, hosting line updated (CI live, patch bump).
+- Route count stated per brief: **23 routes / 10 `/admin/*` ƒ** (runner's 24 incl. `/_not-found`); vitest 321/321 (19 files), e2e 29/29 as reported by runner.
+- Verification: numbers cross-checked against the 15 reports on disk (none invented); `git remote -v` + `git status` confirmed origin exists and the wave is uncommitted (matches the open-ask wording); README table re-read — 83 rows, well-formed.
+- Next steps: none blocking — user-facing asks (DB reset decision, wave commit) already surfaced in AGENTS.md for the orchestrator/user; no code touched.
+
+## Files touched
+- `docs/reports/README.md` — +20 index rows (15 new 08-09, 5 missing 08-08), last-updated → 2026-08-09
+- `AGENTS.md` — status + remains + repo-state facts refreshed (8 edits)
+- `docs/reports/2026-08-09-docs-writer-notifications-status.md` — this report (new)

@@ -116,3 +116,14 @@ Decision: **`String[]` column for MVP.** Justification: (1) there is **no upload
 3. `imageUrls` is `String[]` (Prisma `String[] @default([])`).
 4. Seed: realistic construction-tool catalog, categories, demo customer + demo `OWNER` (bcrypt hash), a demo guest flow is not needed in seed.
 5. Money is `Int` everywhere; `currency` is a `String` default `"RWF"` on `Product`, `Order`, `Payment`.
+
+---
+
+## Superseded 2026-09-22 — flat delivery fee removed
+
+The **flat delivery fee** decision above (`DELIVERY_FEE_CENTS=2000` snapshotted onto `Order.deliveryFeeCents`, line 19) is **REVERSED** by the user on 2026-09-22. The rest of this ADR stands unchanged.
+
+- `Order.deliveryFeeCents` column **dropped** — migration `20260922131646_remove_delivery_fee` (`ALTER TABLE "Order" DROP COLUMN "deliveryFeeCents"`). `DELIVERY_FEE_CENTS` removed from `.env.example` and backend `SiteConfig`.
+- **Totals = subtotal only:** `totalCents == subtotalCents` in the DB, DTOs, and payment `amountCents`. The money rule above (integer minor units, RWF) is unchanged.
+- **Transport is now handled off-app** — coordinated directly between the shop and the customer; no fee line anywhere in the storefront, dashboard, or backend.
+- See also the superseded notes in ADR 0003 (checkout transaction) and ADR 0004 (DTO shapes).

@@ -1,6 +1,6 @@
 # Zubeli — Screen & Route Ownership Contract
 
-*Last updated: 2026-08-03*
+*Last updated: 2026-10-05*
 
 Every route in the app has exactly ONE owning agent. No two agents ever edit the same file. Agents consume shared components but never edit them (foundation owners do).
 
@@ -27,6 +27,9 @@ Every route in the app has exactly ONE owning agent. No two agents ever edit the
 | `/admin/products` | Product list | `inventory-agent` |
 | `/admin/products/new` | Create product | `inventory-agent` |
 | `/admin/products/[id]/edit` | Edit product | `inventory-agent` |
+| `/admin/categories` | Category list | `inventory-agent` |
+| `/admin/categories/new` | Create category | `inventory-agent` |
+| `/admin/categories/[id]/edit` | Edit category | `inventory-agent` |
 | `/admin/stock` | Stock levels, restocking, low-stock alerts | `stock-agent` |
 | `/admin/orders` | Orders list | `orders-screen-agent` |
 | `/admin/orders/[id]` | Order detail + status updates | `orders-screen-agent` |

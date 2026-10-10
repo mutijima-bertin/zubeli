@@ -1,0 +1,11 @@
+# 2026-10-05 — e2e-runner — sales order-number regex
+
+What was done: fixed the latent order-number assertion in `e2e/specs/admin-sales.spec.ts:30` (`/ZBL-[0-9]{8}/` → shared `ORDER_NUMBER_RE` imported from `e2e/data.ts`, real numbers are `ZBL-` + 8 **hex** chars) and removed the unused `Locator` import at `e2e/pages/CatalogPage.ts:1`. Assertion strength unchanged — same "at least one order number visible", correct character class.
+
+Sweep verdicts (every `ZBL-` / `[0-9]{n}` / `TRF-` hit in `e2e/`): **1 wrong → fixed** (`admin-sales.spec.ts:30`); correct = `data.ts:65` (shared def), `data.ts:96` + `checkout.spec.ts:162` (hex), `OrderDetailPage.ts:12`, `SuccessPage.ts:17,22,23`, `OrderHistoryPage.ts:26,30` (all hex), static seed literals `ZBL-00000014`/`ZBL-00000015`/`ZBL-00000011`/`ZBL-000000{13,10,7,1}` and `TRF-8820136` (`data.ts:19-20`, `admin-orders.spec.ts:38-39`, `admin-customers.spec.ts:46-50` — explicitly seeded fixtures), `admin-sales.spec.ts:59` (en-GB date regex — decimal is correct).
+
+Verification: `E2E_BASE_URL=http://localhost:3100 npx playwright test` → **31 passed / 0 failed (3.0m)** twice back-to-back (runs A + B, exit 0). Origin proven from Playwright's own `DEBUG=pw:api` log: 254 navigations to `http://localhost:3100`, **0** to `:3000` (wrapper `/tmp/opencode/run-e2e*.sh` pins the env; dev server on 3100 bound to the TEST DB 5435). `npx tsc --noEmit` exit 0. `npx eslint e2e/ playwright.config.ts` exit 0 — **0 errors, 0 warnings** (CatalogPage warning gone). Dev DB 5434 before = after: products=43 orders=17 categories=10 users=5 order_items=41 payments=17 (untouched). Container on :3000 (`css-frontend`) never stopped/restarted, still Up, responds 308.
+
+Environment note (NOT an app bug): the first two runs failed 2-3 tests because another agent was running a 15× `npm test` loop concurrently — `tests/integration/actions.test.ts:127` `TRUNCATE "Payment","OrderItem","Order",…,"Cart" CASCADE` wipes the shared 5435 DB mid-Playwright-run (symptom: /admin revenue 0, cart emptied). Both runs after that loop finished were fully green. If vitest and Playwright ever run simultaneously again, expect the same cross-suite interference — owner: `tdd-guide`.
+
+Files touched: `e2e/specs/admin-sales.spec.ts`, `e2e/pages/CatalogPage.ts` (this report is the only file outside `e2e/`). No app code, no config changed.

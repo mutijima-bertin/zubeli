@@ -82,3 +82,15 @@ After any mutation that changes storefront-visible data (products, stock, orders
 ## Schema impact (for database-agent)
 
 None — ADR 0001 already covers the schema. `database-agent` only needs to keep the DTO field names in sync with Prisma model field names (they are 1:1 by design, except derived fields: `lineTotalCents`, `totalCents`, `CustomerDTO`, `SalesOverviewDTO`).
+
+---
+
+## Superseded 2026-09-22 — `deliveryFeeCents` dropped from DTOs
+
+The `CartDTO` / `OrderDTO` shapes above (which include `deliveryFeeCents`) are **superseded**: the flat delivery fee was removed by the user on 2026-09-22 (see the superseded note in ADR 0001). Current shapes in `src/types/api.ts`:
+
+- `CartDTO` — `{ id, items: { product: ProductDTO, quantity, lineTotalCents }[], subtotalCents, totalCents, currency }` (`totalCents` derived: equals `subtotalCents`)
+- `OrderDTO` — no `deliveryFeeCents` field; `totalCents` equals `subtotalCents` at checkout
+- `HomepageData` — `deliveryFeeCents` also removed
+
+Field removals landed 2026-09-22 (backend-agent) alongside migration `20260922131646_remove_delivery_fee` (database-agent).

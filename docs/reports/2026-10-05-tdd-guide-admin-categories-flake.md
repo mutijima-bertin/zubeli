@@ -1,0 +1,17 @@
+# tdd-guide — admin-categories cross-worker flake FIXED
+
+**Date:** 2026-10-05 (verification run 2026-10-06) · **Scope:** tests/ only, zero app-code changes
+
+**Race fix (half 2):** `tests/integration/actions.test.ts` no longer runs table-wide `TRUNCATE "Session"`. `truncateTransactionalTables()` (actions.test.ts:123) now truncates only Payment/OrderItem/Order/InventoryMovement/CartItem/Cart and deletes sessions **by ownership namespace** — `session.deleteMany({ user: { email: { contains: "test-" } } })`, before the matching `user.deleteMany`. Chosen over the two alternatives: retrying `ensureSessions()` only widens a window that can never be closed (it masks the class), and `maxWorkers:1` hides it forever; scoping the teardown removes the destructive capability itself, keeps full parallelism, and yields the invariant **no worker's teardown can delete a session row another worker just created** (admin-categories = `cat-`, rate-limit = buckets only, nothing else writes Session). Header comments in both files updated to match.
+
+**Diagnostic fix (half 1):** new shared helper `tests/helpers/assert.ts` — the old `expectOk` called `expect(result.ok).toBe(true)` *first*, which threw a bare boolean mismatch and never reached the `error.code`/`error.message` line behind it. The helper now builds `expected ok result, but the action returned error <code>: <message>` and asserts **with that message attached**; `expectError` likewise names the cause when the action unexpectedly succeeds. Adopted in all 5 files that carried a private copy: admin-categories, actions, storefront/{cart,checkout,account}. No assertion weakened, no `.skip`, no timeouts touched.
+
+**Forced-failure proof** (session row deleted right after `asOwner()`, then restored):
+- before → `AssertionError: expected false to be true // Object.is equality`
+- after → `AssertionError: expected ok result, but the action returned error NOT_AUTHORIZED: You must be signed in: expected false to be true`
+
+**Verification:** `npm test` ×15 consecutive → **21 files / 356 tests passed every run**; `npm test -- --reporter=verbose` ×15 more → same, with **admin-categories 17/17 passed in all 15** (full logs `/tmp/opencode/runlogs/run-{1..15}.log`); `npx tsc --noEmit` = 0; `npm run lint` = 0; `git status --porcelain` shows no stray files from this task (only `tests/helpers/`, `tests/integration/storefront/account.test.ts` + additions to 4 pre-existing modified test files); test DB 5435 namespace-leak check = **0** rows for `cat-crud-%`, `cat-%`, `test-%`, `power-tools-drills-%`, `ZBL-TEST-%` (dev DB 5434 never touched).
+
+**Also found & fixed while proving "no rows leaked"** (both in my allowed files, both pre-existing): admin-categories `afterAll` missed the auto-derived-slug category (no `cat-crud-` prefix) → +1 row/run, now swept by `name contains RUN`; actions.test.ts leaked +6 `Notification` rows/run to the seed owner accounts → now swept by dangling-order link + RUN-stamped copy (deliberately **not** a time-window delete, since other agents share 5435).
+
+**Not done / notes:** no app-code or config changes were needed; `expectOk` is intentionally stricter about `data === undefined` (preserves the storefront guards, all 356 green). Concurrent Playwright e2e activity was observed on 5435 during this session — its rows are excluded by the namespace check; pre-existing hazard (vitest `TRUNCATE Order` vs a simultaneous e2e run) is unchanged and belongs to whoever sequences the suites.

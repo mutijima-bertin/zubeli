@@ -75,3 +75,9 @@ interface PaymentProvider {
 ## Schema impact (for database-agent)
 
 Covered by ADR 0001: `Payment` (`orderId @unique`, `method`, `status`, `confirmedBy?`, `confirmedAt?`, `providerPaymentId?`), `Order` (`bankTransferReference?`, `idempotencyKey? @unique`, `paidAt?`, `status`). No payment schema changes when the gateway lands — only a provider + webhook handler.
+
+---
+
+## Superseded 2026-09-22 — no `deliveryFeeCents` snapshot in checkout
+
+The checkout-transaction step above ("create `Order` (+ snapshot fields, `deliveryFeeCents` snapshot)") is **superseded**: the flat delivery fee was removed by the user on 2026-09-22 (see the superseded note in ADR 0001). The checkout still snapshots order fields in one `$transaction`, but there is no delivery fee — `Order.totalCents == Order.subtotalCents` and `Payment.amountCents` equals that subtotal. Transport is coordinated off-app with the customer.

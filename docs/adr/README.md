@@ -4,7 +4,7 @@ Status: **Accepted** unless marked otherwise. New ADRs take the next number (`00
 
 | # | Title | Status |
 |---|---|---|
-| [0001](0001-data-model.md) | Data model — entities, enums, money (integer RWF minor units), lifecycle, indexes | Accepted |
+| [0001](0001-data-model.md) | Data model — entities, enums, money (integer RWF minor units), lifecycle, indexes | Accepted (delivery-fee decision superseded 2026-09-22) |
 | [0002](0002-auth-model.md) | Auth model — bcryptjs, DB-backed sessions, role guards, CSRF, rate limiting | Accepted |
 | [0003](0003-payment-abstraction.md) | Payment abstraction — Pay-on-Delivery providers, manual verification, gateway-ready interface | Accepted |
 | [0004](0004-api-and-error-contract.md) | API & error contract — server actions, `ActionResult<T>`, typed errors, cursor pagination, DTOs | Accepted |
