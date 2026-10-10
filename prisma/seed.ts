@@ -10,14 +10,16 @@
  *   state is identical on every run.
  *
  * Money: Int minor units = RWF (no circulating subunit). VAT-inclusive, no tax line.
- * Delivery fee is snapshotted from DELIVERY_FEE_CENTS (default 2000).
  */
 import { PrismaClient, Role, OrderStatus, PaymentMethod, PaymentStatus, InventoryMovementType, InventoryReason } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-const DELIVERY_FEE_CENTS = Number(process.env.DELIVERY_FEE_CENTS ?? 2000);
+const SEED_MODE = (process.env.SEED_MODE ?? 'full').trim().toLowerCase();
+const isTaxonomyMode = SEED_MODE === 'taxonomy';
+const isFullMode = !isTaxonomyMode;
+
 const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'owner@zubeli.rw';
 const SEED_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'DemoPass2026!';
 const SEED_ADMIN_2_EMAIL = process.env.SEED_ADMIN_2_EMAIL ?? 'mutijima@gmail.com';
@@ -257,24 +259,26 @@ async function main() {
     },
   });
 
-  const demoCustomers = [
-    { email: 'umutoni@demo.rw', name: 'Umutoni Claudine', phone: '+250788123456' },
-    { email: 'eric@demo.rw', name: 'Eric Mugisha', phone: '+250722345678' },
-  ];
   const customers: { id: string; email: string; name: string; phone: string | null }[] = [];
-  for (const c of demoCustomers) {
-    const user = await prisma.user.upsert({
-      where: { email: c.email },
-      update: {},
-      create: {
-        email: c.email,
-        passwordHash: await bcrypt.hash(DEMO_PASSWORD, 10),
-        name: c.name,
-        phone: c.phone,
-        role: Role.CUSTOMER,
-      },
-    });
-    customers.push(user);
+  if (isFullMode) {
+    const demoCustomers = [
+      { email: 'umutoni@demo.rw', name: 'Umutoni Claudine', phone: '+250788123456' },
+      { email: 'eric@demo.rw', name: 'Eric Mugisha', phone: '+250722345678' },
+    ];
+    for (const c of demoCustomers) {
+      const user = await prisma.user.upsert({
+        where: { email: c.email },
+        update: {},
+        create: {
+          email: c.email,
+          passwordHash: await bcrypt.hash(DEMO_PASSWORD, 10),
+          name: c.name,
+          phone: c.phone,
+          role: Role.CUSTOMER,
+        },
+      });
+      customers.push(user);
+    }
   }
   const customerByEmail = new Map(customers.map((c) => [c.email, c]));
 
@@ -291,56 +295,64 @@ async function main() {
 
   // 3. Products + initial RESTOCK ledger entries (only on first creation)
   const productIdBySlug = new Map<string, string>();
-  for (const p of products) {
-    const categoryId = categoryBySlug.get(p.categorySlug);
-    if (!categoryId) throw new Error(`Seed: missing category ${p.categorySlug}`);
-    // Real photos (public/images/products/stock/) take precedence over
-    // placeholder SVGs; imageUrls stay stable across runs so reseeds converge.
-    // First entry is the hero image (gallery order).
-    const imageUrls = p.photo
-      ? (p.photoFiles ?? [`${p.slug}.jpg`]).map((f) => `/images/products/stock/${f}`)
-      : p.image
-        ? [`/images/products/${p.slug}.svg`]
-        : [];
-    const row = await prisma.product.upsert({
-      where: { slug: p.slug },
-      update: {
-        name: p.name,
-        description: p.description,
-        priceCents: p.priceCents,
-        stockQty: p.initialStock,
-        lowStockThreshold: 5,
-        isPublished: p.isPublished ?? true,
-        featured: p.featured ?? false,
-        imageUrls,
-        categoryId,
-      },
-      create: {
-        slug: p.slug,
-        name: p.name,
-        description: p.description,
-        imageUrls,
-        priceCents: p.priceCents,
-        stockQty: p.initialStock,
-        lowStockThreshold: 5,
-        isPublished: p.isPublished ?? true,
-        featured: p.featured ?? false,
-        categoryId,
-      },
-    });
-    productIdBySlug.set(p.slug, row.id);
+  if (isFullMode) {
+    for (const p of products) {
+      const categoryId = categoryBySlug.get(p.categorySlug);
+      if (!categoryId) throw new Error(`Seed: missing category ${p.categorySlug}`);
+      // Real photos (public/images/products/stock/) take precedence over
+      // placeholder SVGs; imageUrls stay stable across runs so reseeds converge.
+      // First entry is the hero image (gallery order).
+      const imageUrls = p.photo
+        ? (p.photoFiles ?? [`${p.slug}.jpg`]).map((f) => `/images/products/stock/${f}`)
+        : p.image
+          ? [`/images/products/${p.slug}.svg`]
+          : [];
+      // slug is NOT unique at the type level anymore (partial unique index owns
+      // it in SQL, see schema.prisma) — use findFirst instead of where:{slug}.
+      const existing = await prisma.product.findFirst({ where: { slug: p.slug } });
+      const row = existing
+        ? await prisma.product.update({
+            where: { id: existing.id },
+            data: {
+              name: p.name,
+              description: p.description,
+              priceCents: p.priceCents,
+              stockQty: p.initialStock,
+              lowStockThreshold: 5,
+              isPublished: p.isPublished ?? true,
+              featured: p.featured ?? false,
+              imageUrls,
+              categoryId,
+            },
+          })
+        : await prisma.product.create({
+            data: {
+              slug: p.slug,
+              name: p.name,
+              description: p.description,
+              imageUrls,
+              priceCents: p.priceCents,
+              stockQty: p.initialStock,
+              lowStockThreshold: 5,
+              isPublished: p.isPublished ?? true,
+              featured: p.featured ?? false,
+              categoryId,
+            },
+          });
+      productIdBySlug.set(p.slug, row.id);
 
-    const movementCount = await prisma.inventoryMovement.count({ where: { productId: row.id } });
-    if (movementCount === 0) {
-      await prisma.inventoryMovement.create({
-        data: {
-          productId: row.id,
-          type: InventoryMovementType.IN,
-          reason: InventoryReason.RESTOCK,
-          quantity: p.initialStock,
-          note: 'Initial stock (seed)',
-        },
-      });
+      const movementCount = await prisma.inventoryMovement.count({ where: { productId: row.id } });
+      if (movementCount === 0) {
+        await prisma.inventoryMovement.create({
+          data: {
+            productId: row.id,
+            type: InventoryMovementType.IN,
+            reason: InventoryReason.RESTOCK,
+            quantity: p.initialStock,
+            note: 'Initial stock (seed)',
+          },
+        });
+      }
     }
   }
 
@@ -348,135 +360,139 @@ async function main() {
   let createdOrders = 0;
   let createdItems = 0;
   let createdMovements = 0;
-  for (const spec of orders) {
-    const existing = await prisma.order.findUnique({ where: { number: spec.number } });
-    if (existing) continue; // already seeded on a previous run
+  if (isFullMode) {
+    for (const spec of orders) {
+      const existing = await prisma.order.findUnique({ where: { number: spec.number } });
+      if (existing) continue; // already seeded on a previous run
 
-    const createdAt = daysAgo(spec.daysAgo);
-    const isFulfilled = spec.status === 'FULFILLED';
-    const isPaid = spec.status === 'FULFILLED' || spec.status === 'PAID';
-    const isCancelled = spec.status === 'CANCELLED';
-    const paidAt = isPaid ? new Date(createdAt.getTime() + 86_400_000) : null; // paid next day
-    const fulfilledAt = isFulfilled ? new Date(paidAt!.getTime() + 2 * 86_400_000) : null;
-    const cancelledAt = isCancelled ? new Date(createdAt.getTime() + 86_400_000) : null;
+      const createdAt = daysAgo(spec.daysAgo);
+      const isFulfilled = spec.status === 'FULFILLED';
+      const isPaid = spec.status === 'FULFILLED' || spec.status === 'PAID';
+      const isCancelled = spec.status === 'CANCELLED';
+      const paidAt = isPaid ? new Date(createdAt.getTime() + 86_400_000) : null; // paid next day
+      const fulfilledAt = isFulfilled ? new Date(paidAt!.getTime() + 2 * 86_400_000) : null;
+      const cancelledAt = isCancelled ? new Date(createdAt.getTime() + 86_400_000) : null;
 
-    const customer = spec.customer.email ? customerByEmail.get(spec.customer.email) : undefined;
+      const customer = spec.customer.email ? customerByEmail.get(spec.customer.email) : undefined;
 
-    await prisma.$transaction(async (tx) => {
-      // Resolve products and snapshot prices (current catalog price at seed time)
-      const lines: { productId: string; productName: string; unitPriceCents: number; qty: number }[] = [];
-      let subtotalCents = 0;
-      for (const item of spec.items) {
-        const productId = productIdBySlug.get(item.slug);
-        if (!productId) throw new Error(`Seed: unknown product slug ${item.slug}`);
-        const product = await tx.product.findUniqueOrThrow({
-          where: { id: productId },
-          select: { name: true, priceCents: true },
-        });
-        lines.push({ productId, productName: product.name, unitPriceCents: product.priceCents, qty: item.qty });
-        subtotalCents += product.priceCents * item.qty;
-      }
+      await prisma.$transaction(async (tx) => {
+        // Resolve products and snapshot prices (current catalog price at seed time)
+        const lines: { productId: string; productName: string; unitPriceCents: number; qty: number }[] = [];
+        let subtotalCents = 0;
+        for (const item of spec.items) {
+          const productId = productIdBySlug.get(item.slug);
+          if (!productId) throw new Error(`Seed: unknown product slug ${item.slug}`);
+          const product = await tx.product.findUniqueOrThrow({
+            where: { id: productId },
+            select: { name: true, priceCents: true },
+          });
+          lines.push({ productId, productName: product.name, unitPriceCents: product.priceCents, qty: item.qty });
+          subtotalCents += product.priceCents * item.qty;
+        }
 
-      const deliveryFeeCents = DELIVERY_FEE_CENTS;
-      const totalCents = subtotalCents + deliveryFeeCents;
+        const totalCents = subtotalCents;
 
-      const order = await tx.order.create({
-        data: {
-          number: spec.number,
-          status: spec.status as OrderStatus,
-          customerId: customer?.id ?? null,
-          customerName: spec.customer.name,
-          customerPhone: spec.customer.phone,
-          customerEmail: spec.customer.email,
-          customerAddress: spec.customer.address,
-          customerCity: spec.customer.city,
-          subtotalCents,
-          deliveryFeeCents,
-          totalCents,
-          bankTransferReference: spec.bankTransferReference,
-          paidAt,
-          fulfilledAt,
-          cancelledAt,
-          createdAt,
-        },
-      });
-
-      for (const line of lines) {
-        await tx.orderItem.create({
+        const order = await tx.order.create({
           data: {
-            orderId: order.id,
-            productId: line.productId,
-            productName: line.productName,
-            unitPriceCents: line.unitPriceCents,
-            quantity: line.qty,
+            number: spec.number,
+            status: spec.status as OrderStatus,
+            customerId: customer?.id ?? null,
+            customerName: spec.customer.name,
+            customerPhone: spec.customer.phone,
+            customerEmail: spec.customer.email,
+            customerAddress: spec.customer.address,
+            customerCity: spec.customer.city,
+            subtotalCents,
+            totalCents,
+            bankTransferReference: spec.bankTransferReference,
+            paidAt,
+            fulfilledAt,
+            cancelledAt,
+            createdAt,
           },
         });
-        createdItems += 1;
 
-        // Stock ledger: OUT/ORDER at checkout ...
-        await tx.inventoryMovement.create({
-          data: {
-            productId: line.productId,
-            type: InventoryMovementType.OUT,
-            reason: InventoryReason.ORDER,
-            quantity: line.qty,
-            orderId: order.id,
-            note: `Order ${spec.number}`,
-          },
-        });
-        createdMovements += 1;
+        for (const line of lines) {
+          await tx.orderItem.create({
+            data: {
+              orderId: order.id,
+              productId: line.productId,
+              productName: line.productName,
+              unitPriceCents: line.unitPriceCents,
+              quantity: line.qty,
+            },
+          });
+          createdItems += 1;
 
-        // ... and IN/CANCEL restores stock when the order is cancelled (ADR 0001)
-        if (isCancelled) {
+          // Stock ledger: OUT/ORDER at checkout ...
           await tx.inventoryMovement.create({
             data: {
               productId: line.productId,
-              type: InventoryMovementType.IN,
-              reason: InventoryReason.CANCEL,
+              type: InventoryMovementType.OUT,
+              reason: InventoryReason.ORDER,
               quantity: line.qty,
               orderId: order.id,
-              note: `Order ${spec.number} cancelled`,
+              note: `Order ${spec.number}`,
             },
           });
           createdMovements += 1;
-        }
-      }
 
-      await tx.payment.create({
-        data: {
-          orderId: order.id,
-          method: spec.method,
-          // PAID/FULFILLED → confirmed by owner (manual verification demo);
-          // PENDING → waiting; CANCELLED → never completed (FAILED, so it does not
-          // inflate the dashboard's pending-payment count).
-          status: isPaid ? PaymentStatus.PAID : isCancelled ? PaymentStatus.FAILED : PaymentStatus.PENDING,
-          amountCents: totalCents,
-          confirmedById: isPaid ? owner.id : null,
-          confirmedAt: paidAt,
-        },
+          // ... and IN/CANCEL restores stock when the order is cancelled (ADR 0001)
+          if (isCancelled) {
+            await tx.inventoryMovement.create({
+              data: {
+                productId: line.productId,
+                type: InventoryMovementType.IN,
+                reason: InventoryReason.CANCEL,
+                quantity: line.qty,
+                orderId: order.id,
+                note: `Order ${spec.number} cancelled`,
+              },
+            });
+            createdMovements += 1;
+          }
+        }
+
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            method: spec.method,
+            // PAID/FULFILLED → confirmed by owner (manual verification demo);
+            // PENDING → waiting; CANCELLED → never completed (FAILED, so it does not
+            // inflate the dashboard's pending-payment count).
+            status: isPaid ? PaymentStatus.PAID : isCancelled ? PaymentStatus.FAILED : PaymentStatus.PENDING,
+            amountCents: totalCents,
+            confirmedById: isPaid ? owner.id : null,
+            confirmedAt: paidAt,
+          },
+        });
       });
-    });
-    createdOrders += 1;
+      createdOrders += 1;
+    }
   }
 
   // 5. Recompute final stock: initial − sold (all orders) + restored (cancelled orders).
-  const soldBySlug = new Map<string, number>();
-  for (const spec of orders) {
-    for (const item of spec.items) {
-      const sold = soldBySlug.get(item.slug) ?? 0;
-      const restore = spec.status === 'CANCELLED' ? item.qty : 0;
-      soldBySlug.set(item.slug, sold + item.qty - restore);
-    }
-  }
   let updatedStock = 0;
-  for (const p of products) {
-    const sold = soldBySlug.get(p.slug) ?? 0;
-    const finalStock = p.initialStock - sold;
-    await prisma.product.update({
-      where: { slug: p.slug },
-      data: { stockQty: finalStock },
-    });
-    updatedStock += 1;
+  if (isFullMode) {
+    const soldBySlug = new Map<string, number>();
+    for (const spec of orders) {
+      for (const item of spec.items) {
+        const sold = soldBySlug.get(item.slug) ?? 0;
+        const restore = spec.status === 'CANCELLED' ? item.qty : 0;
+        soldBySlug.set(item.slug, sold + item.qty - restore);
+      }
+    }
+    for (const p of products) {
+      const sold = soldBySlug.get(p.slug) ?? 0;
+      const finalStock = p.initialStock - sold;
+      const productId = productIdBySlug.get(p.slug);
+      if (!productId) throw new Error(`Seed invariant: product "${p.slug}" missing from upsert pass`);
+      await prisma.product.update({
+        where: { id: productId },
+        data: { stockQty: finalStock },
+      });
+      updatedStock += 1;
+    }
   }
 
   // 6. Summary
@@ -492,6 +508,7 @@ async function main() {
     ]);
 
   console.log('Zubeli seed complete.');
+  console.log(`  mode: ${SEED_MODE}`);
   console.log(`  users: ${userCount} (owners: ${SEED_ADMIN_EMAIL}, ${SEED_ADMIN_2_EMAIL})`);
   console.log(`  categories: ${categoryCount}`);
   console.log(`  products: ${productCount}`);

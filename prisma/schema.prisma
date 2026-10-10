@@ -59,6 +59,13 @@ enum InventoryReason {
   CANCEL
 }
 
+enum NotificationType {
+  NEW_ORDER // a new order hit the dashboard (owner)
+  PAYMENT_REVIEW // bank transfer needs manual verification (owner)
+  LOW_STOCK // stockQty fell to/below lowStockThreshold (owner)
+  ORDER_STATUS // order status changed (customer)
+}
+
 // ---------------------------------------------------------------------------
 // Entities
 // ---------------------------------------------------------------------------
@@ -77,6 +84,7 @@ model User {
   carts             Cart[] // onDelete: SetNull — cart history survives user deletion
   orders            Order[] // onDelete: SetNull — order history survives user deletion
   confirmedPayments Payment[] // onDelete: SetNull — audit survives owner deletion
+  notifications     Notification[] // onDelete: Cascade — notifications are meaningless without the user
 }
 
 model Session {
@@ -97,6 +105,7 @@ model Category {
   name        String
   slug        String   @unique
   description String?
+  isActive    Boolean  @default(true) // hides a category from the storefront without deleting it or its products
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -106,7 +115,14 @@ model Category {
 model Product {
   id                String    @id @default(cuid())
   name              String
-  slug              String    @unique
+  // slug uniqueness is enforced by a PARTIAL unique index owned by the raw-SQL
+  // migration 20260809090155_slug_partial_unique:
+  //   CREATE UNIQUE INDEX "Product_slug_active_key" ON "Product"("slug") WHERE "deletedAt" IS NULL;
+  // Prisma cannot express partial indexes in schema syntax, so there is NO @unique /
+  // @@index on slug here — the raw migration owns the constraint. Soft-deleted rows
+  // (deletedAt IS NOT NULL) must not block slug reuse on re-create; DO NOT re-add
+  // @unique (it would return the "slug already exists on a soft-deleted row" P2002 bug).
+  slug              String
   description       String?
   imageUrls         String[]  @default([]) // hero image = imageUrls[0]; no ProductImage table in MVP (ADR 0001)
   priceCents        Int
@@ -185,8 +201,7 @@ model Order {
   customerAddress       String // snapshot
   customerCity          String? // snapshot
   subtotalCents         Int // snapshot at checkout (VAT-inclusive)
-  deliveryFeeCents      Int // snapshot of DELIVERY_FEE_CENTS at checkout — env changes never rewrite history
-  totalCents            Int // subtotal + delivery
+  totalCents            Int // order total snapshotted at checkout — equals subtotalCents (no delivery line in the MVP)
   currency              String      @default("RWF")
   bankTransferReference String? // customer-entered transfer ref; required for BANK_TRANSFER (backend validates)
   idempotencyKey        String?     @unique // set to the cart id at checkout — one order per cart
@@ -236,4 +251,38 @@ model Payment {
   confirmedAt       DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+}
+
+// In-app notification bell. No updatedAt by design: notifications are append-only
+// (title/body/link are immutable once created; only readAt mutates).
+model Notification {
+  id        String           @id @default(cuid())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade) // notifications die with the user
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt]) // unread-count + mark-all-read queries
+  @@index([userId, createdAt]) // per-user notification list (newest first)
+}
+
+// Durable, cross-instance rate-limit buckets for the serverless deployment (Vercel).
+// An in-process Map is per-instance, so a horizontally-scaled deployment would give every
+// lambda its own bucket and silently multiply the effective rate limit. This table makes the
+// bucket shared: `key` is the caller identity + route (the id @pk), `tokens` is the remaining
+// allowance, and `updatedAt` is written by @updatedAt on every upsert — that timestamp is also
+// the bucket TTL (the limiter resets/expires a bucket that has not been touched).
+// No createdAt by design: a bucket row is ephemeral state, not business history — it is
+// upserted on first use and pruned once stale (pruning is the application/housekeeping layer's
+// job, see lib/rate-limit.ts). No relations: the limiter references nothing.
+model RateLimitBucket {
+  key       String   @id // caller identity + route — the bucket identity
+  tokens    Int      @default(0) // remaining allowance; clamped at 0 by the limiter
+  updatedAt DateTime @updatedAt // last write = bucket liveness/TTL marker
+
+  @@map("RateLimitBucket")
 }
