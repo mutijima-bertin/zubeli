@@ -11,10 +11,11 @@ export const metadata: Metadata = {
 /**
  * Checkout screen (Phase C-4 — checkout-agent). Server shell: cart state
  * lives in the shared CartProvider (mirrors the cart screen pattern), so
- * only server-only siteConfig values (MoMo number + bank details) are read
- * here and passed down as serializable props — the server-only module never
- * reaches the client bundle (plan risk #6). All form logic, validation
- * mirroring and the createOrderAction submission live in CheckoutFlow.
+ * only server-only siteConfig values (MoMo number + bank details + the
+ * configured payment-method allowlist) are read here and passed down as
+ * serializable props — the server-only module never reaches the client bundle
+ * (plan risk #6). All form logic, validation mirroring and the
+ * createOrderAction submission live in CheckoutFlow.
  */
 export default function CheckoutPage() {
   return (
@@ -27,6 +28,7 @@ export default function CheckoutPage() {
       <CheckoutFlow
         shopMoMoNumber={siteConfig.shopMoMoNumber}
         bankTransferDetails={siteConfig.bankTransferDetails}
+        allowedMethods={siteConfig.paymentMethods}
       />
     </div>
   );

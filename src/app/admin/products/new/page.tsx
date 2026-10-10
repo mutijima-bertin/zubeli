@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { listAll } from "@/lib/db/categories";
+import { listCategoriesForAdmin } from "@/lib/db/categories";
 import { Card, CardBody, CardHeader } from "@/components/ui";
 import { ProductForm } from "../_components/ProductForm";
+import { toCategoryOptions } from "../_components/categoryOptions";
 
 export const metadata: Metadata = {
   title: "New product | Admin — Zubeli",
@@ -12,9 +13,12 @@ export const metadata: Metadata = {
  * Server shell: fetches categories for the select and renders the shared
  * ProductForm in create mode. The action re-checks admin auth, and the
  * admin layout already guards the route.
+ *
+ * Categories come from listCategoriesForAdmin (not listAll) so a category
+ * deactivated while a draft was open still appears, labelled "(inactive)".
  */
 export default async function NewProductPage() {
-  const categories = await listAll();
+  const categories = await listCategoriesForAdmin();
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -28,13 +32,7 @@ export default async function NewProductPage() {
       <Card>
         <CardHeader title="Product details" description="Fields marked * are required." />
         <CardBody>
-          <ProductForm
-            categories={categories.map((category) => ({
-              id: category.id,
-              slug: category.slug,
-              name: category.name,
-            }))}
-          />
+          <ProductForm categories={toCategoryOptions(categories)} />
         </CardBody>
       </Card>
     </div>

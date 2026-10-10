@@ -17,6 +17,7 @@ import {
   type StatCardProps,
 } from "@/components/admin";
 import { formatDate, formatRWF } from "@/lib/format";
+import { BUSINESS_TIME_ZONE, businessMonthRange } from "@/lib/time";
 import { MonthlyRevenueChart } from "../_components/MonthlyRevenueChart";
 import { TopProductsTable } from "../_components/TopProductsTable";
 import { PeriodFilterForm } from "./_components/PeriodFilterForm";
@@ -40,7 +41,67 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** Strict "YYYY-MM-DD" parse into a LOCAL date (never UTC). */
+/**
+ * Wall clock of an instant in BUSINESS_TIME_ZONE. Production runs on UTC
+ * (Vercel) and dev machines can be in any zone, so every calendar question
+ * here is asked of the business zone — never of the runtime's local time.
+ */
+const BUSINESS_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: BUSINESS_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+type BusinessParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function businessParts(instant: Date): BusinessParts {
+  const values: Record<string, number> = {};
+  for (const part of BUSINESS_PARTS.formatToParts(instant)) {
+    if (part.type !== "literal") values[part.type] = Number(part.value);
+  }
+  return {
+    year: values.year ?? 0,
+    month: values.month ?? 1,
+    day: values.day ?? 1,
+    hour: values.hour ?? 0,
+    minute: values.minute ?? 0,
+    second: values.second ?? 0,
+  };
+}
+
+/** Business-zone UTC offset (ms) in effect at `instant`. */
+function zoneOffsetMs(instant: Date): number {
+  const p = businessParts(instant);
+  const wallAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return wallAsUtc - (instant.getTime() - instant.getUTCMilliseconds());
+}
+
+/** 00:00 business time on a calendar day → the UTC instant (two-pass, DST-safe). */
+function businessDayStart(year: number, month: number, day: number): Date {
+  const wallAsUtc = Date.UTC(year, month - 1, day);
+  const firstPass = new Date(wallAsUtc - zoneOffsetMs(new Date(wallAsUtc)));
+  return new Date(wallAsUtc - zoneOffsetMs(firstPass));
+}
+
+/** Instant → "YYYY-MM-DD" business day (the `<input type="date">` shape). */
+function businessDayKey(instant: Date): string {
+  const { year, month, day } = businessParts(instant);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Strict "YYYY-MM-DD" parse into 00:00 business time on that day (never UTC). */
 function parseDateInput(value: string | undefined): Date | null {
   if (!value) return null;
   const match = DATE_INPUT.exec(value);
@@ -48,25 +109,10 @@ function parseDateInput(value: string | undefined): Date | null {
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  const valid =
-    date.getFullYear() === year &&
-    date.getMonth() === month - 1 &&
-    date.getDate() === day;
-  return valid ? date : null;
-}
-
-/** Local date → "YYYY-MM-DD" for `<input type="date">` values. */
-function toDateInputValue(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-/** First day → last day (23:59:59.999) of the current month. */
-function currentMonthRange(): { from: Date; to: Date } {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1);
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  return { from, to };
+  const start = businessDayStart(year, month, day);
+  const parts = businessParts(start);
+  const valid = parts.year === year && parts.month === month && parts.day === day;
+  return valid ? start : null;
 }
 
 /** StatCard passes `string | number` — coerce to cents for formatRWF. */
@@ -76,10 +122,12 @@ const rwf: StatCardProps["format"] = (value) => formatRWF(Number(value));
  * /admin/sales — sales reports (sales-agent).
  *
  * Server-rendered from the query string: `?from=YYYY-MM-DD&to=YYYY-MM-DD`
- * drive getPeriodReportAction (default: current month). KPI cards come from
- * the report; the revenue-by-month chart and top products are global
- * (last 12 months / all time). The only client island is the period form,
- * which pushes new query params — the page then re-fetches server-side.
+ * drive getPeriodReportAction (default: the current business month, 1st →
+ * last millisecond). Dates are read as Africa/Kigali calendar days so a UTC
+ * server never books evening Kigali orders into the previous day. KPI cards
+ * come from the report; the revenue-by-month chart and top products are
+ * global (last 12 months / all time). The only client island is the period
+ * form, which pushes new query params — the page then re-fetches server-side.
  */
 export default async function SalesReportsPage({
   searchParams,
@@ -87,7 +135,7 @@ export default async function SalesReportsPage({
   searchParams: Promise<SalesSearchParams>;
 }) {
   const params = await searchParams;
-  const { from: defaultFrom, to: defaultTo } = currentMonthRange();
+  const { from: defaultFrom, to: defaultTo } = businessMonthRange();
 
   let from = parseDateInput(firstParam(params.from)) ?? defaultFrom;
   let to = parseDateInput(firstParam(params.to)) ?? defaultTo;
@@ -120,8 +168,8 @@ export default async function SalesReportsPage({
         title="Period"
         filters={
           <PeriodFilterForm
-            from={toDateInputValue(from)}
-            to={toDateInputValue(to)}
+            from={businessDayKey(from)}
+            to={businessDayKey(to)}
           />
         }
         summary={

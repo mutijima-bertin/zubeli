@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getProductAdminAction } from "@/actions/admin/products";
-import { listAll } from "@/lib/db/categories";
+import { listCategoriesForAdmin } from "@/lib/db/categories";
 import { Alert, Button } from "@/components/ui";
 import { EditProductClient } from "./_components/EditProductClient";
+import { toCategoryOptions } from "../../_components/categoryOptions";
 
 export const metadata: Metadata = {
   title: "Edit product | Admin — Zubeli",
@@ -13,6 +14,9 @@ export const metadata: Metadata = {
  * Edit product — /admin/products/[id]/edit (Inventory).
  * Server shell: fetches the product + categories, renders the EditProductClient
  * (form + quick actions). NOT_FOUND (unknown id) → notFound().
+ * Categories come from listCategoriesForAdmin (not listAll) so a product whose
+ * category was just deactivated keeps its selected option, labelled
+ * "(inactive)" — otherwise saving would silently corrupt the relation.
  */
 export default async function EditProductPage({
   params,
@@ -22,14 +26,10 @@ export default async function EditProductPage({
   const { id } = await params;
   const [productResult, categoryRows] = await Promise.all([
     getProductAdminAction({ productId: id }),
-    listAll(),
+    listCategoriesForAdmin(),
   ]);
 
-  const categories = categoryRows.map((category) => ({
-    id: category.id,
-    slug: category.slug,
-    name: category.name,
-  }));
+   const categories = toCategoryOptions(categoryRows);
 
   if (!productResult.ok) {
     if (productResult.error.code === "NOT_FOUND") notFound();

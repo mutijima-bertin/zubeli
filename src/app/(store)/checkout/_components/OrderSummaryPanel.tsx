@@ -2,8 +2,8 @@
 /**
  * Sticky order summary (Phase C-4 — checkout-agent). Reads the shared
  * useCart context — same source of truth as the cart screen, so quantities
- * edited elsewhere stay in sync. Compact line list + subtotal / delivery /
- * total, all through the Price primitive.
+ * edited elsewhere stay in sync. Compact line list + subtotal / total
+ * (order total equals subtotal), all through the Price primitive.
  */
 import Image from "next/image";
 import { Card, CardBody, IconBox, Price } from "@/components/ui";
@@ -61,12 +61,6 @@ export function OrderSummaryPanel() {
             </dt>
             <dd className="font-medium text-ink">
               <Price cents={cart.subtotalCents} currency={cart.currency} size="sm" />
-            </dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-stone-600">Delivery</dt>
-            <dd className="font-medium text-ink">
-              <Price cents={cart.deliveryFeeCents} currency={cart.currency} size="sm" />
             </dd>
           </div>
           <div className="flex items-baseline justify-between gap-4 border-t border-stone-100 pt-3">

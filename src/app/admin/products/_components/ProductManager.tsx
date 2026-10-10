@@ -25,7 +25,13 @@ import { DataTable, FilterBar, type DataTableColumn } from "@/components/admin";
 import { formatRWF } from "@/lib/format";
 import type { Page, ProductDTO } from "@/types/api";
 
-export type CategoryOption = { id: string; slug: string; name: string };
+export type CategoryOption = {
+  id: string;
+  slug: string;
+  name: string;
+  /** From listCategoriesForAdmin — inactive rows render as "Name (inactive)". */
+  isActive: boolean;
+};
 
 type StatusFilter = "all" | "published" | "unpublished";
 
@@ -251,7 +257,7 @@ export function ProductManager({
         <option value="">All categories</option>
         {categories.map((category) => (
           <option key={category.id} value={category.slug}>
-            {category.name}
+            {category.isActive ? category.name : `${category.name} (inactive)`}
           </option>
         ))}
       </Select>

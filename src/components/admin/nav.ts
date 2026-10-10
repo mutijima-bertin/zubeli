@@ -1,5 +1,13 @@
 import type { ComponentType, SVGProps } from "react";
-import { IconChartBar, IconInventory, IconLayoutGrid, IconPackage, IconReceipt, IconUsers } from "./icons";
+import {
+  IconChartBar,
+  IconFolder,
+  IconInventory,
+  IconLayoutGrid,
+  IconPackage,
+  IconReceipt,
+  IconUsers,
+} from "./icons";
 
 export type AdminNavItem = {
   label: string;
@@ -15,6 +23,7 @@ export type AdminNavItem = {
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { label: "Overview", href: "/admin", icon: IconLayoutGrid },
   { label: "Products", href: "/admin/products", icon: IconPackage },
+  { label: "Categories", href: "/admin/categories", icon: IconFolder },
   { label: "Stock", href: "/admin/stock", icon: IconInventory },
   { label: "Orders", href: "/admin/orders", icon: IconReceipt },
   { label: "Customers", href: "/admin/customers", icon: IconUsers },

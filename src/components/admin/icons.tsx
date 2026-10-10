@@ -90,6 +90,15 @@ export function IconChartBar(props: IconProps) {
   );
 }
 
+/** Folder — Categories (product taxonomy management). */
+export function IconFolder(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7Z" />
+    </Icon>
+  );
+}
+
 /** Shop front — "View storefront" link. */
 export function IconStore(props: IconProps) {
   return (
@@ -125,6 +134,15 @@ export function IconSort(props: IconProps) {
     <Icon {...props}>
       <path d="m7 15 5 5 5-5" />
       <path d="m7 9 5-5 5 5" />
+    </Icon>
+  );
+}
+
+/** Chevron right — whole-card CTA affordance (StatCard `href`). */
+export function IconChevronRight(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m9 6 6 6-6 6" />
     </Icon>
   );
 }

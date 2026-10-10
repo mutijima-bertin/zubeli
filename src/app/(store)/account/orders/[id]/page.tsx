@@ -161,12 +161,6 @@ function OrderDetail({ order }: { order: OrderDTO }) {
                     <Price cents={order.subtotalCents} size="sm" />
                   </dd>
                 </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-stone-500">Delivery fee</dt>
-                  <dd className="font-medium text-ink">
-                    <Price cents={order.deliveryFeeCents} size="sm" />
-                  </dd>
-                </div>
                 <div className="flex justify-between gap-3 border-t border-stone-100 pt-2">
                   <dt className="font-semibold text-ink">Total</dt>
                   <dd className="font-semibold text-ink">

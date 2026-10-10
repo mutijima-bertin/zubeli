@@ -30,7 +30,13 @@ function getFieldErrors(details: unknown): FieldErrors {
   return fieldErrors as FieldErrors;
 }
 
-export type CategoryOption = { id: string; slug: string; name: string };
+export type CategoryOption = {
+  id: string;
+  slug: string;
+  name: string;
+  /** From listCategoriesForAdmin — inactive rows render as "Name (inactive)". */
+  isActive: boolean;
+};
 
 const MAX_IMAGES = 8;
 
@@ -325,7 +331,7 @@ export function ProductForm({
             </option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.isActive ? category.name : `${category.name} (inactive)`}
               </option>
             ))}
           </Select>

@@ -2,11 +2,17 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@/components/ui";
+import { businessToday } from "@/lib/time";
 
-/** Today's date as a "YYYY-MM-DD" string (local, for `<input type="date">`). */
+/**
+ * Today in business time (Africa/Kigali) as "YYYY-MM-DD" — the shape
+ * `<input type="date">` needs. Never `new Date()` local parts: the server and
+ * the owner's browser can sit in different zones, and the picker's `max` must
+ * match the day the report counts.
+ */
 function todayInputValue(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const { y, m, d } = businessToday();
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 /**

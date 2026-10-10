@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NotificationBell } from "@/components/ui";
 import { AccountMenu } from "./AccountMenu";
 import { CartBadge } from "./CartBadge";
 import { MobileMenu } from "./MobileMenu";
@@ -15,10 +16,10 @@ export function Header({
   user,
   categories,
 }: {
-  user: { id: string; name: string; email: string } | null;
+  user: { id: string; name: string; email: string; role: "OWNER" | "CUSTOMER" } | null;
   categories: { slug: string; name: string; productCount: number }[];
 }) {
-  const accountUser = user ? { name: user.name, email: user.email } : null;
+  const accountUser = user ? { name: user.name, email: user.email, role: user.role } : null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
@@ -45,6 +46,7 @@ export function Header({
 
         <div className="ml-auto flex items-center gap-1.5">
           <SearchBox className="hidden w-56 md:block lg:w-64" />
+          {user && <NotificationBell userId={user.id} />}
           <AccountMenu user={accountUser} />
           <CartBadge />
         </div>

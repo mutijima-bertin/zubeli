@@ -3,8 +3,9 @@ import { Card, CardBody, Price } from "@/components/ui";
 import { useCart } from "@/lib/hooks/useCart";
 
 /**
- * Order summary (Phase C-3 — cart-agent): subtotal / delivery / total from
- * the authoritative CartDTO, all through formatRWF via the Price primitive.
+ * Order summary (Phase C-3 — cart-agent): subtotal / total from the
+ * authoritative CartDTO (no delivery fee — total === subtotal), all through
+ * formatRWF via the Price primitive.
  * Hidden while the cart is loading or empty (EmptyCartState owns that UX).
  */
 export function OrderSummary() {
@@ -25,12 +26,6 @@ export function OrderSummary() {
             </dt>
             <dd className="font-medium text-ink">
               <Price cents={cart.subtotalCents} currency={cart.currency} size="sm" />
-            </dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-stone-600">Delivery</dt>
-            <dd className="font-medium text-ink">
-              <Price cents={cart.deliveryFeeCents} currency={cart.currency} size="sm" />
             </dd>
           </div>
           <div className="flex items-baseline justify-between gap-4 border-t border-stone-100 pt-3">

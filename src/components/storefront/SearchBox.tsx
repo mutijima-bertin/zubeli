@@ -31,8 +31,8 @@ export function SearchBox({ className }: { className?: string }) {
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search tools…"
         autoComplete="off"
-        className="h-11 w-full rounded-full border border-stone-300 bg-white pl-9 pr-14 text-sm text-ink placeholder:text-stone-400 transition-colors focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
-      />
+        className="h-11 w-full rounded-full border border-stone-300 bg-white pl-9 pr-14 text-sm text-ink placeholder:text-stone-500 transition-colors focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+        />
       <button
         type="submit"
         aria-label="Submit search"

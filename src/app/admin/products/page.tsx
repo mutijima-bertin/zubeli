@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import { listAll } from "@/lib/db/categories";
+import { listCategoriesForAdmin } from "@/lib/db/categories";
 import { listProductsAdminAction } from "@/actions/admin/products";
 import { Alert, Button, EmptyState, IconPlus, IconShieldCheck } from "@/components/ui";
-import {
-  ProductManager,
-  type CategoryOption,
-} from "./_components/ProductManager";
+import { ProductManager } from "./_components/ProductManager";
+import { toCategoryOptions } from "./_components/categoryOptions";
 
 export const metadata: Metadata = {
   title: "Products | Admin — Zubeli",
@@ -19,16 +17,15 @@ export const metadata: Metadata = {
  * (requireAdminOrThrow), so the page needs no extra guard.
  */
 export default async function AdminProductsPage() {
+  // listCategoriesForAdmin (not listAll) so a product whose category was just
+  // deactivated still shows its selected option — inactive rows are labelled
+  // "(inactive)" in the selects (defect fix from backend-agent).
   const [pageResult, categoryRows] = await Promise.all([
     listProductsAdminAction({ limit: 25 }),
-    listAll(),
+    listCategoriesForAdmin(),
   ]);
 
-  const categories: CategoryOption[] = categoryRows.map((category) => ({
-    id: category.id,
-    slug: category.slug,
-    name: category.name,
-  }));
+  const categories = toCategoryOptions(categoryRows);
 
   return (
     <div className="space-y-6">

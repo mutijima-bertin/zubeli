@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui";
 import { cx } from "@/components/ui";
 import type { StatusTone } from "@/lib/format";
+import { IconChevronRight } from "./icons";
 
 const iconChip: Record<StatusTone, string> = {
   neutral: "bg-stone-100 text-stone-600",
@@ -27,12 +29,23 @@ export type StatCardProps = {
   icon?: ReactNode;
   /** Chip tone (also drives the delta arrow color family). */
   tone?: StatusTone;
+  /**
+   * Make the WHOLE card a CTA link (native anchor). When set, the card
+   * renders as a `next/link` with hover lift + a slide-in chevron, and an
+   * accessible name of `${title} — open ${href}`. Omit for a plain card.
+   */
+  href?: string;
   className?: string;
 };
 
 /**
  * Scannable dashboard KPI. Label + large value + optional trend, with an
  * icon chip. Pure presentational — screens pass plain data only.
+ *
+ * Pass `href` to turn the whole card into a link (e.g. actionable KPIs on
+ * the overview): same layout/styling, plus a chevron that slides in on
+ * hover/focus-visible and a subtle border+shadow lift. The global
+ * `:focus-visible` outline (globals.css) applies on keyboard focus.
  */
 export function StatCard({
   title,
@@ -42,12 +55,13 @@ export function StatCard({
   deltaTone = "neutral",
   icon,
   tone = "neutral",
+  href,
   className,
 }: StatCardProps) {
   const display = format ? format(value) : String(value);
 
-  return (
-    <Card className={cx("p-5", className)}>
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-stone-500">{title}</p>
@@ -55,13 +69,37 @@ export function StatCard({
             {display}
           </p>
         </div>
-        {icon && (
-          <span
-            className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", iconChip[tone])}
-            aria-hidden="true"
-          >
-            {icon}
+
+        {href ? (
+          <span className="flex shrink-0 items-center gap-2">
+            {icon && (
+              <span
+                className={cx(
+                  "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                  iconChip[tone],
+                )}
+                aria-hidden="true"
+              >
+                {icon}
+              </span>
+            )}
+            <IconChevronRight
+              aria-hidden="true"
+              className="size-4 shrink-0 -translate-x-1 text-stone-400 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100"
+            />
           </span>
+        ) : (
+          icon && (
+            <span
+              className={cx(
+                "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                iconChip[tone],
+              )}
+              aria-hidden="true"
+            >
+              {icon}
+            </span>
+          )
         )}
       </div>
 
@@ -82,6 +120,23 @@ export function StatCard({
           {delta}
         </p>
       )}
-    </Card>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        aria-label={`${title} — open ${href}`}
+        className={cx(
+          "group block rounded-xl border border-stone-200 bg-white p-5 shadow-card transition-all duration-150 hover:border-stone-300 hover:shadow-pop focus-visible:border-brand-500",
+          className,
+        )}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return <Card className={cx("p-5", className)}>{content}</Card>;
 }

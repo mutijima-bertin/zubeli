@@ -26,7 +26,11 @@ export default async function StoreLayout({ children }: { children: React.ReactN
   const hasCartToken = Boolean(cartStore.get(CART_COOKIE)?.value);
   const initialCart = session || hasCartToken ? await getCart() : null;
   const categories = await listAll();
-  const user = session ? { id: session.id, name: session.name, email: session.email } : null;
+  // Full user incl. role: header menus show role-appropriate entries
+  // (OWNER → "Admin panel" in place of the customer-account links).
+  const user = session
+    ? { id: session.id, name: session.name, email: session.email, role: session.role }
+    : null;
 
   return (
     <ToastProvider>

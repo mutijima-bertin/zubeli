@@ -17,8 +17,19 @@
  *      the success screen renders `paymentInstructions` from the provider.
  * Never hardcode provider credentials or gateway specifics in the UI —
  * display copy flows from server props / paymentInstructions only.
+ *
+ * ---------------------------------------------------------------------------
+ * CONFIGURABLE SUB-SET (owner launch)
+ * ---------------------------------------------------------------------------
+ * PAYMENT_OPTIONS is the full catalogue of what this screen CAN offer; the
+ * storefront is configured with a subset via the server-side allowlist
+ * (`siteConfig.paymentMethods`, parsed from `PAYMENT_METHODS`). The list the
+ * customer sees = catalogue ∩ allowlist, in catalogue order (cash first).
+ * Only the visible slice changes — never the option wording. The server stays
+ * authoritative: it re-rejects any method outside its own allowlist.
  * ---------------------------------------------------------------------------
  */
+import { useId } from "react";
 import { Card, CardBody, CardHeader, FormField, Input } from "@/components/ui";
 import { cx } from "@/components/ui";
 import type { PaymentMethod } from "@/types/api";
@@ -57,6 +68,34 @@ export type BankTransferDetailsProps = {
   accountNumber: string | null;
 };
 
+/** Rendered when the allowlist is unusable (missing / empty / unrenderable). */
+export const FALLBACK_PAYMENT_METHOD: PaymentMethod = "COD_CASH";
+
+/**
+ * The options a customer may actually pick, in catalogue order (COD first).
+ *
+ * Single source of truth for both the rendered radio group and the parent's
+ * selected value (CheckoutFlow) — so the checked radio and the submitted
+ * method can never disagree.
+ *
+ * Defensive: an allowlist that is missing, empty, or names nothing this
+ * screen can render degrades to cash on delivery rather than an unusable
+ * payment step. Unknown/duplicate entries are simply not renderable here and
+ * are dropped; the server owns their validation.
+ */
+export function visiblePaymentOptions(
+  allowedMethods: PaymentMethod[] | null | undefined,
+): PaymentOptionConfig[] {
+  if (!Array.isArray(allowedMethods) || allowedMethods.length === 0) {
+    return PAYMENT_OPTIONS.filter((option) => option.method === FALLBACK_PAYMENT_METHOD);
+  }
+  const allowed = new Set(allowedMethods);
+  const options = PAYMENT_OPTIONS.filter((option) => allowed.has(option.method));
+  return options.length > 0
+    ? options
+    : PAYMENT_OPTIONS.filter((option) => option.method === FALLBACK_PAYMENT_METHOD);
+}
+
 export function PaymentMethodPicker({
   value,
   onChange,
@@ -65,6 +104,7 @@ export function PaymentMethodPicker({
   errors,
   shopMoMoNumber,
   bankTransferDetails,
+  allowedMethods,
 }: {
   value: PaymentMethod;
   onChange: (method: PaymentMethod) => void;
@@ -74,19 +114,41 @@ export function PaymentMethodPicker({
   /** Server props from siteConfig (server-only) — never import siteConfig client-side. */
   shopMoMoNumber: string | null;
   bankTransferDetails: BankTransferDetailsProps | null;
+  /** Server prop from siteConfig (server-only) — the configured subset to offer. */
+  allowedMethods: PaymentMethod[] | null;
 }) {
+  const options = visiblePaymentOptions(allowedMethods);
+  // Never render a radio group with nothing checked: if `value` is not
+  // offered (allowlist narrowed after selection), fall through to the first
+  // visible option so the step stays completable.
+  const selected =
+    options.some((option) => option.method === value) ? value : options[0]?.method ?? value;
+
+  // Stable ids for the selected method's instruction block + the group error,
+  // so the radio and the fieldset can be programmatically described (a11y).
+  const baseId = useId();
+  const instructionId = (method: PaymentMethod) => `${baseId}-instruction-${method}`;
+  const paymentMethodErrorId = `${baseId}-error`;
+
   return (
     <Card>
       <CardHeader>
         <h2 className="text-base font-semibold text-ink">Payment method</h2>
       </CardHeader>
       <CardBody>
-        <fieldset>
+        <fieldset
+          aria-describedby={errors.paymentMethod ? paymentMethodErrorId : undefined}
+        >
           <legend className="sr-only">Choose how you&apos;ll pay</legend>
 
           <div className="space-y-3">
-            {PAYMENT_OPTIONS.map((option) => {
-              const checked = value === option.method;
+            {options.map((option) => {
+              const checked = selected === option.method;
+              // Only the SELECTED method exposes its instruction block, so only
+              // then does the radio describe it. Combine (not overwrite) so a
+              // future static description on the radio is preserved.
+              const instruction = checked ? instructionId(option.method) : null;
+              const describedBy = [instruction].filter(Boolean).join(" ") || undefined;
               return (
                 <div key={option.method}>
                   <label
@@ -103,6 +165,7 @@ export function PaymentMethodPicker({
                       value={option.method}
                       checked={checked}
                       onChange={() => onChange(option.method)}
+                      aria-describedby={describedBy}
                       className="mt-0.5 size-4 shrink-0 accent-brand-700"
                     />
                     <span className="min-w-0">
@@ -112,7 +175,7 @@ export function PaymentMethodPicker({
                   </label>
 
                   {checked && option.method === "COD_MOBILE_MONEY" && (
-                    <p className="mt-2 pl-7 text-xs text-stone-500">
+                    <p id={instructionId("COD_MOBILE_MONEY")} className="mt-2 pl-7 text-xs text-stone-500">
                       {shopMoMoNumber
                         ? `Pay at the door via MTN MoMo or Airtel Money to ${shopMoMoNumber}.`
                         : "Pay at the door via MTN MoMo or Airtel Money when your order arrives."}{" "}
@@ -121,7 +184,7 @@ export function PaymentMethodPicker({
                   )}
 
                   {checked && option.method === "BANK_TRANSFER" && (
-                    <div className="mt-3 space-y-3 pl-7">
+                    <div id={instructionId("BANK_TRANSFER")} className="mt-3 space-y-3 pl-7">
                       {bankTransferDetails ? (
                         <ul className="space-y-0.5 text-xs text-stone-600">
                           {bankTransferDetails.bankName && (
@@ -169,7 +232,7 @@ export function PaymentMethodPicker({
           </div>
 
           {errors.paymentMethod && (
-            <p role="alert" className="mt-2 text-sm text-danger-600">
+            <p id={paymentMethodErrorId} role="alert" className="mt-2 text-sm text-danger-600">
               {errors.paymentMethod.join(" ")}
             </p>
           )}

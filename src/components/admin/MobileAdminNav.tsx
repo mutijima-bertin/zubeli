@@ -23,9 +23,9 @@ export function MobileAdminNav() {
       </button>
 
       <Dialog open={open} onClose={() => setOpen(false)} title="Admin menu" side="end">
-        <div className="px-3 py-4">
+        <nav aria-label="Admin" className="px-3 py-4">
           <SidebarNav variant="light" onNavigate={() => setOpen(false)} />
-        </div>
+        </nav>
       </Dialog>
     </>
   );

@@ -44,10 +44,46 @@ export function Dialog({
     if (!open) return;
     const panel = panelRef.current;
     const previouslyFocused = document.activeElement as HTMLElement | null;
+    let cancelled = false;
+
+    function getFocusable(): HTMLElement[] {
+      if (!panel) return [];
+      return Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+    }
+
+    // Focus the first focusable control, else the panel itself (purely
+    // informational dialogs have no controls).
+    function focusIntoPanel(preferLast = false) {
+      if (!panel) return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        panel.focus();
+        return;
+      }
+      (preferLast ? focusable[focusable.length - 1] : focusable[0]).focus();
+    }
+
     if (panel) panel.focus();
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    // A control that becomes disabled (e.g. a loading Button) or unmounts drops
+    // focus to <body>; the next Tab could then reach background content. Pull
+    // focus back into the panel on the next tick.
+    function onFocusOut() {
+      window.setTimeout(() => {
+        if (cancelled || !panel || !panel.isConnected) return;
+        const active = document.activeElement;
+        if (!active || active === document.body || !panel.contains(active)) {
+          focusIntoPanel();
+        }
+      }, 0);
+    }
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -55,26 +91,37 @@ export function Dialog({
         return;
       }
       if (event.key !== "Tab" || !panel) return;
-      const focusable = panel.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
+      const focusable = getFocusable();
       if (focusable.length === 0) {
         event.preventDefault();
         return;
       }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      const active = document.activeElement;
+      if (!active || !panel.contains(active)) {
+        // Focus escaped (e.g. control disabled) — wrap instead of letting Tab
+        // reach background content.
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+        return;
+      }
+      if (event.shiftKey && (active === first || active === panel)) {
+        // Shift+Tab from the first control, or from the panel itself where
+        // focus starts (tabIndex=-1), wraps to the last control.
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && active === last) {
         event.preventDefault();
         first.focus();
       }
     }
 
+    panel?.addEventListener("focusout", onFocusOut);
     document.addEventListener("keydown", onKeyDown);
     return () => {
+      cancelled = true;
+      panel?.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus?.();

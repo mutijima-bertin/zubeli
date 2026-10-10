@@ -40,6 +40,12 @@ export default async function AdminLayout({
   return (
     <ToastProvider>
       <div className="flex min-h-dvh bg-stone-50 text-ink">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand-700 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+        >
+          Skip to content
+        </a>
         <AdminSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AdminTopBar user={user} />

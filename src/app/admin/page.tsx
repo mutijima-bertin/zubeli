@@ -1,6 +1,4 @@
-import type { ReactNode } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
   getOverviewAction,
   getRevenueByMonthAction,
@@ -32,24 +30,6 @@ const RECENT_ORDERS_COUNT = 5;
 
 /** StatCard passes `string | number` — coerce to cents for formatRWF. */
 const rwf: StatCardProps["format"] = (value) => formatRWF(Number(value));
-
-/** Whole-card link for actionable KPIs (low stock, pending payments). */
-function KpiLink({
-  href,
-  srLabel,
-  children,
-}: {
-  href: string;
-  srLabel: string;
-  children: ReactNode;
-}) {
-  return (
-    <Link href={href} className="block rounded-xl">
-      {children}
-      <span className="sr-only">{srLabel}</span>
-    </Link>
-  );
-}
 
 /**
  * /admin — dashboard overview (sales-agent).
@@ -98,37 +78,38 @@ export default async function AdminDashboardPage() {
             format={rwf}
             tone="brand"
             icon={<IconChartBar className="size-5" />}
+            href="/admin/sales"
           />
           <StatCard
             title="Orders"
             value={overview.data.orderCount}
             tone="info"
             icon={<IconReceipt className="size-5" />}
+            href="/admin/orders"
           />
           <StatCard
             title="Avg order value"
             value={overview.data.avgOrderValueCents}
             format={rwf}
             icon={<IconStore className="size-5" />}
+            href="/admin/sales"
           />
-          <KpiLink href="/admin/stock" srLabel="View stock levels">
-            <StatCard
-              title="Low stock"
-              value={overview.data.lowStockCount}
-              tone="danger"
-              icon={<IconInventory className="size-5" />}
-              className="h-full transition-colors hover:border-brand-600"
-            />
-          </KpiLink>
-          <KpiLink href="/admin/orders" srLabel="View orders awaiting payment">
-            <StatCard
-              title="Pending payments"
-              value={overview.data.pendingPaymentCount}
-              tone="warning"
-              icon={<IconReceipt className="size-5" />}
-              className="h-full transition-colors hover:border-brand-600"
-            />
-          </KpiLink>
+          <StatCard
+            title="Low stock"
+            value={overview.data.lowStockCount}
+            tone="danger"
+            icon={<IconInventory className="size-5" />}
+            href="/admin/stock"
+            className="h-full"
+          />
+          <StatCard
+            title="Pending payments"
+            value={overview.data.pendingPaymentCount}
+            tone="warning"
+            icon={<IconReceipt className="size-5" />}
+            href="/admin/orders"
+            className="h-full"
+          />
         </div>
       )}
 

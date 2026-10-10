@@ -86,20 +86,35 @@ export function MobileMenu({
           {user ? (
             <div className="flex flex-col gap-2 border-t border-stone-100 pt-4">
               <p className="px-3 text-sm font-semibold text-ink">{user.name}</p>
-              <Link
-                href="/account"
-                onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2.5 text-sm text-ink hover:bg-stone-50"
-              >
-                My account
-              </Link>
-              <Link
-                href="/account/orders"
-                onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2.5 text-sm text-ink hover:bg-stone-50"
-              >
-                Order history
-              </Link>
+              {user.role === "OWNER" ? (
+                <Link
+                  href="/admin"
+                  onClick={() => setOpen(false)}
+                  className="flex flex-col gap-0.5 rounded-lg px-3 py-2.5 text-sm text-ink hover:bg-stone-50"
+                >
+                  <span className="font-semibold">Admin panel</span>
+                  <span className="text-xs font-normal text-stone-500">
+                    Manage products, orders &amp; stock
+                  </span>
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/account"
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg px-3 py-2.5 text-sm text-ink hover:bg-stone-50"
+                  >
+                    My account
+                  </Link>
+                  <Link
+                    href="/account/orders"
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg px-3 py-2.5 text-sm text-ink hover:bg-stone-50"
+                  >
+                    Order history
+                  </Link>
+                </>
+              )}
               <Button variant="ghost" size="sm" onClick={signOut} className="justify-start px-3">
                 Sign out
               </Button>

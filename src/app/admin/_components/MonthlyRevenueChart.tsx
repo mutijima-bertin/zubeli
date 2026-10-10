@@ -1,22 +1,32 @@
 import { cx } from "@/components/ui";
 import { formatRWF } from "@/lib/format";
+import { BUSINESS_TIME_ZONE } from "@/lib/time";
 import type { MonthlyRevenueDTO } from "@/types/api";
 
 const MAX_BAR_HEIGHT = 136;
 
-const MONTH_LABEL = new Intl.DateTimeFormat("en-GB", { month: "short" });
+// Pinned to business time: an unpinned formatter reads the runtime's zone, and
+// a local-midnight Date on a zone ahead of Kigali lands in the previous month.
+const MONTH_LABEL = new Intl.DateTimeFormat("en-GB", {
+  month: "short",
+  timeZone: BUSINESS_TIME_ZONE,
+});
 
-/** "2026-08" → "Aug" (built from parts so it is timezone-safe). */
+/**
+ * "2026-08" → "Aug". The key is already a business-month key, so the label is
+ * anchored at UTC midnight and formatted in BUSINESS_TIME_ZONE — that pair
+ * always renders the month the key names, in every server/client zone.
+ */
 function monthLabel(key: string): string {
   const [year, month] = key.split("-").map((part) => Number(part));
-  return MONTH_LABEL.format(new Date(year, (month ?? 1) - 1, 1));
+  return MONTH_LABEL.format(new Date(Date.UTC(year, (month ?? 1) - 1, 1)));
 }
 
-/** "2026-08" → "Aug '26" — year-aware axis label, same timezone-safe parts. */
+/** "2026-08" → "Aug '26" — year-aware axis label, same timezone-safe anchor. */
 function monthAxisLabel(key: string): string {
-  const [year, month] = key.split("-").map((part) => Number(part));
-  const yy = String(year ?? 1).slice(-2);
-  return `${MONTH_LABEL.format(new Date(year, (month ?? 1) - 1, 1))} '${yy}`;
+  const year = Number(key.split("-")[0] ?? 1);
+  const yy = String(year).slice(-2);
+  return `${monthLabel(key)} '${yy}`;
 }
 
 /** Drop a trailing ".0" from a fixed-decimal string ("1.0" → "1"). */

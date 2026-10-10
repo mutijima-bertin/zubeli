@@ -27,7 +27,7 @@ const AUTH_ROUTES = new Set(["/login", "/register"]);
  * tricks (/\…) — plus the auth routes themselves — falls back to
  * DEFAULT_NEXT.
  */
-export function sanitizeNextPath(value: string | null | undefined): string {
+function sanitizeNextPath(value: string | null | undefined): string {
   if (!value) return DEFAULT_NEXT;
   if (value.startsWith("//") || value.startsWith("/\\") || value.startsWith("\\")) return DEFAULT_NEXT;
   if (!value.startsWith("/")) return DEFAULT_NEXT;

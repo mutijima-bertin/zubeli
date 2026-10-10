@@ -15,6 +15,7 @@ export * from "./FormField";
 export * from "./icons";
 export * from "./Input";
 export * from "./Label";
+export * from "./NotificationBell";
 export * from "./PaginationLoadMore";
 export * from "./Price";
 export * from "./QuantityStepper";

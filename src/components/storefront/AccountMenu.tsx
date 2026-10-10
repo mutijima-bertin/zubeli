@@ -6,12 +6,13 @@ import { logoutAction } from "@/actions/auth";
 import { IconChevronDown, IconUser } from "@/components/ui";
 import { cx } from "@/components/ui";
 
-export type AccountMenuUser = { name: string; email: string } | null;
+export type AccountMenuUser = { name: string; email: string; role?: "OWNER" | "CUSTOMER" } | null;
 
 /**
- * Account entry point: guest → "Sign in"; customer → name dropdown with
- * account links + sign-out. Click-outside and Esc close the menu; the
- * toggle button carries aria-expanded/haspopup (disclosure pattern).
+ * Account entry point: guest → "Sign in"; signed-in → name dropdown with
+ * role-appropriate links + sign-out. OWNER sees "Admin panel" (→ /admin)
+ * instead of the customer-account links. Click-outside and Esc close the
+ * menu; the toggle button carries aria-expanded/haspopup (disclosure pattern).
  */
 export function AccountMenu({ user }: { user: AccountMenuUser }) {
   const [open, setOpen] = useState(false);
@@ -56,6 +57,8 @@ export function AccountMenu({ user }: { user: AccountMenuUser }) {
     );
   }
 
+  const isOwner = user.role === "OWNER";
+
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -77,20 +80,35 @@ export function AccountMenu({ user }: { user: AccountMenuUser }) {
             <p className="truncate text-xs text-stone-500">{user.email}</p>
           </div>
           <div className="flex flex-col pt-1">
-            <Link
-              href="/account"
-              onClick={() => setOpen(false)}
-              className="rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-stone-50"
-            >
-              My account
-            </Link>
-            <Link
-              href="/account/orders"
-              onClick={() => setOpen(false)}
-              className="rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-stone-50"
-            >
-              Order history
-            </Link>
+            {isOwner ? (
+              <Link
+                href="/admin"
+                onClick={() => setOpen(false)}
+                className="flex flex-col gap-0.5 rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-stone-50"
+              >
+                <span className="font-semibold">Admin panel</span>
+                <span className="text-xs font-normal text-stone-500">
+                  Manage products, orders &amp; stock
+                </span>
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/account"
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-stone-50"
+                >
+                  My account
+                </Link>
+                <Link
+                  href="/account/orders"
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-stone-50"
+                >
+                  Order history
+                </Link>
+              </>
+            )}
             <button
               type="button"
               onClick={signOut}

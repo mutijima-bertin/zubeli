@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getHomepageData } from "@/lib/storefront";
 import { CategoriesShowcase } from "./_components/CategoriesShowcase";
-import { DeliveryBanner } from "./_components/DeliveryBanner";
+import { ClosingCta } from "./_components/ClosingCta";
 import { FeaturedProducts } from "./_components/FeaturedProducts";
 import { Hero } from "./_components/Hero";
 import { TrustSignals } from "./_components/TrustSignals";
@@ -24,10 +24,10 @@ export default async function HomePage() {
   return (
     <>
       <Hero />
-      <DeliveryBanner deliveryFeeCents={data.deliveryFeeCents} />
       <FeaturedProducts products={data.featured} />
       <CategoriesShowcase categories={data.categories} />
-      <TrustSignals deliveryFeeCents={data.deliveryFeeCents} />
+      <TrustSignals />
+      <ClosingCta />
     </>
   );
 }

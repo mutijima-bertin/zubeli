@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { User } from "@prisma/client";
+import { NotificationBell } from "@/components/ui";
 import { IconStore } from "./icons";
 import { LogoutButton } from "./LogoutButton";
 import { MobileAdminNav } from "./MobileAdminNav";
@@ -7,7 +8,9 @@ import { MobileAdminNav } from "./MobileAdminNav";
 /**
  * Admin top bar — white, dense (56px). Left: mobile hamburger. Right:
  * "View storefront" link, logged-in-as email chip (server-rendered from the
- * guarded session — never trusted client input) and the sign-out button.
+ * guarded session — never trusted client input), the notification bell and
+ * the sign-out button. OWNER-only: the admin layout guards the session
+ * before this renders (non-OWNERs redirect to /).
  */
 export function AdminTopBar({ user }: { user: User }) {
   return (
@@ -28,6 +31,8 @@ export function AdminTopBar({ user }: { user: User }) {
         <p className="truncate text-sm font-medium text-ink">{user.name}</p>
         <p className="truncate text-xs text-stone-500">{user.email}</p>
       </div>
+
+      <NotificationBell userId={user.id} />
 
       <LogoutButton />
     </header>

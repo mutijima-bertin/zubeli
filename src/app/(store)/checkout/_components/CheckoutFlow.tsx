@@ -17,7 +17,11 @@ import { Alert, Button, EmptyState, Skeleton, useToast } from "@/components/ui";
 import { useCart } from "@/lib/hooks/useCart";
 import type { ActionResult, CheckoutResult, PaymentMethod } from "@/types/api";
 import { OrderSummaryPanel } from "./OrderSummaryPanel";
-import { PaymentMethodPicker, type BankTransferDetailsProps } from "./PaymentMethodPicker";
+import {
+  PaymentMethodPicker,
+  visiblePaymentOptions,
+  type BankTransferDetailsProps,
+} from "./PaymentMethodPicker";
 import { PlaceOrderButton } from "./PlaceOrderButton";
 import { ShippingForm } from "./ShippingForm";
 import {
@@ -72,9 +76,12 @@ function validateForm(values: FormValues): FieldErrors {
 export function CheckoutFlow({
   shopMoMoNumber,
   bankTransferDetails,
+  allowedMethods,
 }: {
   shopMoMoNumber: string | null;
   bankTransferDetails: BankTransferDetailsProps | null;
+  /** Server prop from siteConfig (server-only) — the configured subset to offer. */
+  allowedMethods: PaymentMethod[] | null;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -97,14 +104,35 @@ export function CheckoutFlow({
     [result],
   );
 
+  /*
+   * The configured subset the customer may pick (server allowlist ∩ this
+   * screen's catalogue). Derived, not stored: narrowing the allowlist can
+   * never leave the form holding a method the radio group no longer offers.
+   */
+  const visibleOptions = useMemo(() => visiblePaymentOptions(allowedMethods), [allowedMethods]);
+
+  /**
+   * The method the form actually uses. When the current selection is not
+   * offered (allowlist narrowed, e.g. owner launched cash-only) the first
+   * visible option is selected instead — otherwise the radio group would
+   * show nothing checked AND we would submit a method the server rejects.
+   */
+  const paymentMethod = useMemo<PaymentMethod>(
+    () =>
+      visibleOptions.some((option) => option.method === values.paymentMethod)
+        ? values.paymentMethod
+        : (visibleOptions[0]?.method ?? values.paymentMethod),
+    [visibleOptions, values.paymentMethod],
+  );
+
   const fieldErrors: FieldErrors = useMemo(() => {
     const merged = { ...clientErrors, ...serverErrors };
     // The reference only exists while BANK_TRANSFER is selected — switching
     // methods clears the input value (handlePaymentMethodChange) and any
     // error that belonged to it (plan C-4).
-    if (values.paymentMethod !== "BANK_TRANSFER") delete merged.bankTransferReference;
+    if (paymentMethod !== "BANK_TRANSFER") delete merged.bankTransferReference;
     return merged;
-  }, [clientErrors, serverErrors, values.paymentMethod]);
+  }, [clientErrors, serverErrors, paymentMethod]);
 
   // VALIDATION errors normally render per-field; a VALIDATION error without
   // fieldErrors (e.g. "Your cart is empty", unavailable product) or any
@@ -137,17 +165,22 @@ export function CheckoutFlow({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const errors = validateForm(values);
+    // Validate and submit the EFFECTIVE method (the one actually offered and
+    // checked in the radio group), never a stale selection the configured
+    // allowlist no longer offers.
+    const submitted: FormValues = { ...values, paymentMethod };
+
+    const errors = validateForm(submitted);
     setClientErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     setResult(null);
     startTransition(async () => {
       const res = await createOrderAction({
-        customer: values.customer,
-        paymentMethod: values.paymentMethod,
+        customer: submitted.customer,
+        paymentMethod: submitted.paymentMethod,
         bankTransferReference:
-          values.paymentMethod === "BANK_TRANSFER" ? values.bankTransferReference : undefined,
+          submitted.paymentMethod === "BANK_TRANSFER" ? submitted.bankTransferReference : undefined,
       });
 
       if (res.ok) {
@@ -231,7 +264,7 @@ export function CheckoutFlow({
         />
 
         <PaymentMethodPicker
-          value={values.paymentMethod}
+          value={paymentMethod}
           onChange={handlePaymentMethodChange}
           bankTransferReference={values.bankTransferReference}
           onReferenceChange={(reference) =>
@@ -240,6 +273,7 @@ export function CheckoutFlow({
           errors={fieldErrors}
           shopMoMoNumber={shopMoMoNumber}
           bankTransferDetails={bankTransferDetails}
+          allowedMethods={allowedMethods}
         />
 
         <PlaceOrderButton pending={isPending} />
