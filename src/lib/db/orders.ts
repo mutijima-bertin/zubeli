@@ -10,9 +10,6 @@ import { prisma } from '../db';
 import { idCursor, normalizeLimit, toPage, type PageParams } from './pagination';
 import { InsufficientStockError, ProductNotFoundError } from './errors';
 
-/** Delivery fee is snapshotted onto the order at checkout (ADR 0001). */
-const DELIVERY_FEE_CENTS = Number(process.env.DELIVERY_FEE_CENTS ?? 2000);
-
 export type CreateOrderInput = {
   userId?: string;
   customer: { name: string; phone: string; email?: string; address: string; city?: string };
@@ -81,8 +78,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderWithRel
           return { product, quantity: item.quantity };
         });
 
-        const deliveryFeeCents = DELIVERY_FEE_CENTS;
-        const totalCents = subtotalCents + deliveryFeeCents;
+        const totalCents = subtotalCents;
 
         // 3. Order + snapshot items + PENDING payment in one create
         const order = await tx.order.create({
@@ -95,7 +91,6 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderWithRel
             customerAddress: input.customer.address,
             customerCity: input.customer.city ?? null,
             subtotalCents,
-            deliveryFeeCents,
             totalCents,
             currency,
             bankTransferReference: input.bankTransferReference ?? null,

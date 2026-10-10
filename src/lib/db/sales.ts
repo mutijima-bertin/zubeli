@@ -6,6 +6,7 @@
  */
 import { Prisma, OrderStatus, PaymentStatus } from '@prisma/client';
 import { prisma } from '../db';
+import { BUSINESS_TIME_ZONE, businessMonthKey, businessMonthRange, businessNow } from '../time';
 
 const PAID_STATUSES: OrderStatus[] = [OrderStatus.PAID, OrderStatus.FULFILLED];
 
@@ -49,22 +50,29 @@ export type MonthlyRevenue = {
   orderCount: number;
 };
 
-function monthKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-/** Revenue per calendar month (PAID + FULFILLED), last `months` months, gap-filled. */
+/**
+ * Revenue per calendar month (PAID + FULFILLED), last `months` months,
+ * gap-filled. Month boundaries come from src/lib/time.ts (Africa/Kigali), so
+ * the buckets do not shift with the server's timezone — the runtime is UTC in
+ * production. One `now` snapshot is threaded through the whole computation so
+ * the 12 keys cannot straddle a month boundary.
+ *
+ * `"createdAt"` is a UTC wall clock (timestamp WITHOUT time zone), so the
+ * bucket expression projects it into business time before truncating; without
+ * that an order placed at 01:00 Kigali on the 1st (22:00 UTC on the last day of
+ * the previous month) would be counted in the wrong month.
+ */
 export async function revenueByMonth(months = 12): Promise<MonthlyRevenue[]> {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+  const now = businessNow();
+  const windowStart = businessMonthRange(months - 1, now).from;
 
   const rows = await prisma.$queryRaw<{ month: string; revenueCents: number; orderCount: number }[]>(
     Prisma.sql`
-      SELECT to_char(date_trunc('month', "createdAt"), 'YYYY-MM') AS month,
+      SELECT to_char(date_trunc('month', "createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${BUSINESS_TIME_ZONE}), 'YYYY-MM') AS month,
              SUM("totalCents")::int AS "revenueCents",
              COUNT(*)::int AS "orderCount"
       FROM "Order"
-      WHERE status IN ('PAID', 'FULFILLED') AND "createdAt" >= ${from}
+      WHERE status IN ('PAID', 'FULFILLED') AND "createdAt" >= ${windowStart}
       GROUP BY 1
       ORDER BY 1
     `,
@@ -73,7 +81,8 @@ export async function revenueByMonth(months = 12): Promise<MonthlyRevenue[]> {
   const byMonth = new Map(rows.map((r) => [r.month, r]));
   const result: MonthlyRevenue[] = [];
   for (let i = 0; i < months; i++) {
-    const key = monthKey(new Date(now.getFullYear(), now.getMonth() - (months - 1) + i, 1));
+    // i = 0 is the oldest bucket, i = months-1 is the current business month.
+    const key = businessMonthKey(businessMonthRange(months - 1 - i, now).from);
     const row = byMonth.get(key);
     result.push(row ?? { month: key, revenueCents: 0, orderCount: 0 });
   }

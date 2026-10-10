@@ -16,6 +16,7 @@ import {
   updateProduct,
 } from '@/lib/products-admin';
 import { toActionResult } from '@/lib/errors';
+import { notifyOwners } from '@/lib/notifications';
 import { toProductDTO } from '@/lib/dto';
 import type { ActionResult, Page, ProductDTO } from '@/types/api';
 
@@ -54,6 +55,16 @@ export async function createProductAction(input: unknown): Promise<ActionResult<
     const data = productSchema.parse(input);
     const product = await createProduct(data);
     invalidateProductCaches();
+    // LOW_STOCK fires on creation when the initial stock is at/below threshold
+    // (fail-soft — an admin-created product must never fail to appear).
+    if (product.stockQty <= product.lowStockThreshold) {
+      await notifyOwners({
+        type: 'LOW_STOCK',
+        title: `Low stock: ${product.name}`,
+        body: `Only ${product.stockQty} left (threshold ${product.lowStockThreshold})`,
+        link: '/admin/stock',
+      });
+    }
     return { ok: true, data: toProductDTO(product) };
   } catch (error) {
     return toActionResult(error);

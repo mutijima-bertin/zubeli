@@ -9,6 +9,7 @@ import { adminListOrdersSchema, orderIdSchema } from '@/lib/validation/orders';
 import { requireAdminOrThrow } from '@/lib/auth/guards';
 import { cancelOrder, confirmOrderPayment, fulfillOrder, getOrderAdmin, listOrdersAdmin, refundOrder } from '@/lib/orders-admin';
 import { buildPaymentInstructions } from '@/lib/payments';
+import { notifyOrderCustomer } from '@/lib/notifications';
 import { toActionResult } from '@/lib/errors';
 import { toOrderDTO, toOrderListItemDTO } from '@/lib/dto';
 import type { ActionResult, OrderDTO, OrderListItemDTO, Page } from '@/types/api';
@@ -52,6 +53,12 @@ export async function confirmOrderPaymentAction(input: unknown): Promise<ActionR
     const { orderId } = orderIdSchema.parse(input);
     const order = await confirmOrderPayment(orderId, admin); // PENDING → PAID
     invalidateOrderCaches(orderId);
+    await notifyOrderCustomer(order, {
+      type: 'ORDER_STATUS',
+      title: `Order ${order.number} paid`,
+      body: 'Payment confirmed',
+      link: `/account/orders/${order.id}`,
+    });
     return { ok: true, data: toOrderDTO(order) };
   } catch (error) {
     return toActionResult(error);
@@ -64,6 +71,12 @@ export async function fulfillOrderAction(input: unknown): Promise<ActionResult<O
     const { orderId } = orderIdSchema.parse(input);
     const order = await fulfillOrder(orderId); // PAID → FULFILLED
     invalidateOrderCaches(orderId);
+    await notifyOrderCustomer(order, {
+      type: 'ORDER_STATUS',
+      title: `Order ${order.number} on the way`,
+      body: 'Your order is on the way',
+      link: `/account/orders/${order.id}`,
+    });
     return { ok: true, data: toOrderDTO(order) };
   } catch (error) {
     return toActionResult(error);
@@ -76,6 +89,12 @@ export async function cancelOrderAction(input: unknown): Promise<ActionResult<Or
     const { orderId } = orderIdSchema.parse(input);
     const order = await cancelOrder(orderId); // PENDING|PAID → CANCELLED + restock
     invalidateOrderCaches(orderId);
+    await notifyOrderCustomer(order, {
+      type: 'ORDER_STATUS',
+      title: `Order ${order.number} cancelled`,
+      body: 'Your order has been cancelled',
+      link: `/account/orders/${order.id}`,
+    });
     return { ok: true, data: toOrderDTO(order) };
   } catch (error) {
     return toActionResult(error);
@@ -88,6 +107,12 @@ export async function refundOrderAction(input: unknown): Promise<ActionResult<Or
     const { orderId } = orderIdSchema.parse(input);
     const order = await refundOrder(orderId); // PAID|FULFILLED → REFUNDED + restock
     invalidateOrderCaches(orderId);
+    await notifyOrderCustomer(order, {
+      type: 'ORDER_STATUS',
+      title: `Order ${order.number} refunded`,
+      body: 'Your order has been refunded',
+      link: `/account/orders/${order.id}`,
+    });
     return { ok: true, data: toOrderDTO(order) };
   } catch (error) {
     return toActionResult(error);

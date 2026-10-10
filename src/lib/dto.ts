@@ -94,15 +94,14 @@ export function toCartItemDTO(item: FullCartItem): CartItemDTO {
   };
 }
 
-export function toCartDTO(cart: { id: string; items: FullCartItem[] }, deliveryFeeCents: number): CartDTO {
+export function toCartDTO(cart: { id: string; items: FullCartItem[] }): CartDTO {
   const items = cart.items.map(toCartItemDTO);
   const subtotalCents = items.reduce((sum, i) => sum + i.lineTotalCents, 0);
   return {
     id: cart.id,
     items,
     subtotalCents,
-    deliveryFeeCents,
-    totalCents: subtotalCents + deliveryFeeCents,
+    totalCents: subtotalCents,
     currency: items[0]?.product.currency ?? 'RWF',
   };
 }
@@ -177,7 +176,6 @@ export function toOrderDTO(order: OrderForDTO): OrderDTO {
     method,
     items: order.items.map(toOrderItemDTO),
     subtotalCents: order.subtotalCents,
-    deliveryFeeCents: order.deliveryFeeCents,
     totalCents: order.totalCents,
     currency: order.currency,
     customerName: order.customerName,

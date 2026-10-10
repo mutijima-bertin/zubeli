@@ -18,8 +18,6 @@ export type CheckoutContext = {
   cartId: string;
   items: { productId: string; quantity: number }[];
   subtotalCents: number;
-  /** Snapshot of DELIVERY_FEE_CENTS at checkout — history never rewrites. */
-  deliveryFeeCents: number;
   totalCents: number;
   currency: string;
 };
@@ -34,13 +32,11 @@ export async function buildCheckoutContext(cartId: string): Promise<CheckoutCont
   }
   const items = cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity }));
   const subtotalCents = cart.items.reduce((sum, i) => sum + i.product.priceCents * i.quantity, 0);
-  const deliveryFeeCents = siteConfig.deliveryFeeCents;
   return {
     cartId: cart.id,
     items,
     subtotalCents,
-    deliveryFeeCents,
-    totalCents: subtotalCents + deliveryFeeCents,
+    totalCents: subtotalCents,
     currency: cart.items[0]?.product.currency ?? siteConfig.currency,
   };
 }
@@ -69,6 +65,14 @@ export async function placeOrder(
     throw new ValidationError('bankTransferReference is required when paying by bank transfer');
   }
 
+  // Resolve the payment provider BEFORE any persistence. getPaymentProvider
+  // enforces the configured `PAYMENT_METHODS` allowlist, so a disabled/unknown
+  // method throws here — before createOrder writes the Order + Payment, moves
+  // stock, appends the inventory ledger and clears the cart. (Regression fixed
+  // 2026-10-05: this used to run AFTER createOrder, so a tampered request
+  // persisted an unwanted order and a retry returned it via idempotencyKey.)
+  const provider = getPaymentProvider(input.paymentMethod);
+
   const order = await createOrder({
     userId: input.userId,
     customer: input.customer,
@@ -83,7 +87,6 @@ export async function placeOrder(
   const payment = order.payment;
   if (!payment) throw new NotFoundError('Payment not found for this order');
 
-  const provider = getPaymentProvider(payment.method);
   const intent = await provider.createPayment({
     orderId: order.id,
     method: payment.method,

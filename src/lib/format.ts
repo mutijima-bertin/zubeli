@@ -4,7 +4,11 @@
  * components and inside SSR'd pages alike).
  *
  * Money is integer minor units: 1 RWF = 1 unit (ADR 0004).
+ * Dates render in BUSINESS_TIME_ZONE (Africa/Kigali), never the runtime's local
+ * zone — production runs UTC, so an un-pinned toLocale* would show the wrong
+ * day for orders placed in the evening (src/lib/time.ts is dependency-free).
  */
+import { BUSINESS_TIME_ZONE } from "@/lib/time";
 import type {
   InventoryMovementType,
   InventoryReason,
@@ -20,27 +24,39 @@ export type StatusMeta = { label: string; tone: StatusTone };
 // Money
 // ---------------------------------------------------------------------------
 
+// Hoisted once: formatRWF runs per row in grids/tables/summaries. The locale
+// is fixed; `currency` only changes the appended suffix, so a single formatter
+// is safe (no keying needed).
+const RWF_NUMBER_FORMAT = new Intl.NumberFormat("en-RW");
+
 /**
  * "12,500 RWF" — no decimals (RWF has none). Negative amounts (refunds)
  * format with a leading minus sign.
  */
 export function formatRWF(cents: number, currency = "RWF"): string {
   const value = Number.isFinite(cents) ? Math.trunc(cents) : 0;
-  const amount = new Intl.NumberFormat("en-RW").format(value);
-  return `${amount} ${currency}`;
+  return `${RWF_NUMBER_FORMAT.format(value)} ${currency}`;
 }
 
 // ---------------------------------------------------------------------------
 // Dates
 // ---------------------------------------------------------------------------
 
-const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+// Same style as before, now pinned to business time (Africa/Kigali): without
+// timeZone these render in the runtime's local zone (UTC on Vercel).
+const DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: BUSINESS_TIME_ZONE,
+};
 const DATETIME_FORMAT: Intl.DateTimeFormatOptions = {
   day: "numeric",
   month: "short",
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: BUSINESS_TIME_ZONE,
 };
 
 function parseDate(iso: string | null | undefined): Date | null {

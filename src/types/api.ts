@@ -41,8 +41,11 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: ApiErr
 
 /**
  * POST /api/admin/upload response (guarded admin image upload, backend-agent).
- * `data.url` is a LOCAL path (`/uploads/products/<uuid>.<ext>`) — prefix with
- * the site origin when displaying, never an absolute URL.
+ * `data.url` is whatever the storage seam returned (src/lib/uploads-store.ts):
+ * a Vercel Blob absolute URL in production, or a site-relative path
+ * (`/uploads/products/<uuid>.<ext>`) in local dev. Both are valid values for
+ * `Product.imageUrls` and for `<Image src>` / `<img src>` — render it as-is,
+ * never concatenate the site origin onto it.
  */
 export type UploadResult = ActionResult<{ url: string }>;
 
@@ -58,6 +61,8 @@ export type Page<T> = {
 // ---------------------------------------------------------------------------
 
 export type Role = 'CUSTOMER' | 'OWNER';
+/** In-app notification bell — schema mirror of the Notification enum. */
+export type NotificationType = 'NEW_ORDER' | 'PAYMENT_REVIEW' | 'LOW_STOCK' | 'ORDER_STATUS';
 export type ProductSort = 'newest' | 'price-asc' | 'price-desc' | 'featured';
 /** Storefront availability filter — derives from `stockQty`: in > 0, low 1–5, out = 0. */
 export type AvailabilityFilter = 'in' | 'low' | 'out';
@@ -82,6 +87,17 @@ export type UserDTO = {
   name: string;
   phone: string | null;
   role: Role;
+};
+
+/** One in-app notification row (bell) — append-only, only readAt mutates. */
+export type NotificationDTO = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
 };
 
 export type CategoryDTO = {
@@ -146,8 +162,7 @@ export type CartDTO = {
   id: string;
   items: CartItemDTO[];
   subtotalCents: number;
-  deliveryFeeCents: number;
-  totalCents: number; // derived: subtotal + delivery
+  totalCents: number; // derived: subtotal
   currency: string;
 };
 
@@ -184,7 +199,6 @@ export type OrderDTO = {
   method: PaymentMethod;
   items: OrderItemDTO[];
   subtotalCents: number;
-  deliveryFeeCents: number; // snapshot at checkout
   totalCents: number;
   currency: string;
   customerName: string; // snapshot

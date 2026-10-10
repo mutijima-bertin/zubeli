@@ -9,7 +9,6 @@ import "server-only";
 import { listAll, type CategoryWithCount } from "@/lib/db/categories";
 import { getBySlug, getFeatured, listPublished, type ProductSort } from "@/lib/db/products";
 import { toProductCardDTO, toProductDTO } from "@/lib/dto";
-import { siteConfig } from "@/lib/site";
 import type { AvailabilityFilter, CatalogFilter, Page, ProductCardDTO, ProductDTO } from "@/types/api";
 
 export const CATALOG_PAGE_SIZE = 20;
@@ -44,16 +43,14 @@ export type { CatalogFilter } from "@/types/api";
 export type HomepageData = {
   featured: ProductCardDTO[];
   categories: CategoryWithCount[];
-  deliveryFeeCents: number;
 };
 
-/** Home sections: featured products + category counts (delivery fee for banners). */
+/** Home sections: featured products + category counts. */
 export async function getHomepageData(): Promise<HomepageData> {
   const [featured, categories] = await Promise.all([getFeatured(8), listAll()]);
   return {
     featured: featured.map(toProductCardDTO),
     categories,
-    deliveryFeeCents: siteConfig.deliveryFeeCents,
   };
 }
 

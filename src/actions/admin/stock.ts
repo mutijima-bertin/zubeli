@@ -10,6 +10,7 @@ import { requireAdminOrThrow } from '@/lib/auth/guards';
 import { adjustStock, listProductsAdmin } from '@/lib/products-admin';
 import { listMovements } from '@/lib/db/inventory';
 import { toActionResult } from '@/lib/errors';
+import { notifyOwners } from '@/lib/notifications';
 import { toProductDTO, toStockMovementDTO } from '@/lib/dto';
 import type { ActionResult, Page, ProductDTO, StockMovementDTO } from '@/types/api';
 
@@ -31,12 +32,24 @@ export async function listStockAdminAction(input: unknown): Promise<ActionResult
   }
 }
 
+/** LOW_STOCK owner notification — fires whenever the RESULTING qty is at/below threshold. */
+function maybeNotifyLowStock(product: { name: string; stockQty: number; lowStockThreshold: number }): Promise<void> {
+  if (product.stockQty > product.lowStockThreshold) return Promise.resolve();
+  return notifyOwners({
+    type: 'LOW_STOCK',
+    title: `Low stock: ${product.name}`,
+    body: `Only ${product.stockQty} left (threshold ${product.lowStockThreshold})`,
+    link: '/admin/stock',
+  });
+}
+
 export async function adjustStockAction(input: unknown): Promise<ActionResult<ProductDTO>> {
   try {
     await requireAdminOrThrow();
     const data = stockAdjustSchema.parse(input);
     const product = await adjustStock(data);
     invalidateStockCaches();
+    await maybeNotifyLowStock(product); // fail-soft — stock flow never breaks
     return { ok: true, data: toProductDTO(product) };
   } catch (error) {
     return toActionResult(error);

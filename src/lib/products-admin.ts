@@ -53,6 +53,20 @@ export async function getProductAdmin(productId: string): Promise<AdminProduct> 
   return product;
 }
 
+/**
+ * Exact, human-readable slug-collision copy. Shown twice (same text): as the
+ * ValidationError.message (page-level if the form renders non-VALIDATION
+ * errors) and under the Slug field via details.fieldErrors.
+ */
+export function slugConflictMessage(existingName: string, slug: string): string {
+  return `A product named \u201c${existingName}\u201d already uses the slug \u201c${slug}\u201d. Delete it or pick a different slug.`;
+}
+
+function throwSlugConflict(existingName: string, slug: string): never {
+  const message = slugConflictMessage(existingName, slug);
+  throw new ValidationError(message, { fieldErrors: { slug: [message] } });
+}
+
 export async function createProduct(data: {
   name: string;
   slug: string;
@@ -66,6 +80,15 @@ export async function createProduct(data: {
   imageUrls: string[];
 }): Promise<AdminProduct> {
   return prisma.$transaction(async (tx) => {
+    // Friendly pre-check (partial unique index only constrains LIVE rows —
+    // soft-deleted slugs are reusable). Race fallback: P2002 → generic
+    // CONFLICT in src/lib/errors.ts (two admins creating the same slug).
+    const slugOwner = await tx.product.findFirst({
+      where: { slug: data.slug, deletedAt: null },
+      select: { name: true },
+    });
+    if (slugOwner) throwSlugConflict(slugOwner.name, data.slug);
+
     const product = await tx.product.create({
       data: {
         name: data.name,
@@ -114,6 +137,17 @@ export async function updateProduct(
 ): Promise<AdminProduct> {
   const existing = await prisma.product.findUnique({ where: { id: productId } });
   if (!existing) throw new NotFoundError('Product not found');
+
+  // Slug collision guard — same friendly copy as createProduct, but the
+  // product being edited never conflicts with its own slug. Soft-deleted
+  // rows don't block (partial unique index). Race fallback: P2002 mapping.
+  if (data.slug !== undefined && data.slug !== existing.slug) {
+    const slugOwner = await prisma.product.findFirst({
+      where: { slug: data.slug, deletedAt: null, id: { not: productId } },
+      select: { name: true },
+    });
+    if (slugOwner) throwSlugConflict(slugOwner.name, data.slug);
+  }
 
   const stockDelta = data.stockQty !== undefined ? data.stockQty - existing.stockQty : 0;
   const patch = { ...data, description: data.description === undefined ? undefined : data.description ?? null };

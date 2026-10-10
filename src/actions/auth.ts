@@ -23,7 +23,7 @@ function getDummyHash(): Promise<string> {
 export async function registerAction(input: unknown): Promise<ActionResult<UserDTO>> {
   try {
     const data = registerSchema.parse(input);
-    assertRateLimit(`register:${await clientIp()}`, RATE_LIMITS.register);
+    await assertRateLimit(`register:${await clientIp()}`, RATE_LIMITS.register);
 
     if (await findByEmail(data.email)) {
       throw new ConflictError('An account with this email already exists');
@@ -42,7 +42,7 @@ export async function registerAction(input: unknown): Promise<ActionResult<UserD
 export async function loginAction(input: unknown): Promise<ActionResult<UserDTO>> {
   try {
     const data = loginSchema.parse(input);
-    assertRateLimit(`login:${await clientIp()}:${data.email}`, RATE_LIMITS.login);
+    await assertRateLimit(`login:${await clientIp()}:${data.email}`, RATE_LIMITS.login);
 
     const user = await findByEmail(data.email);
     const hash = user?.passwordHash ?? (await getDummyHash());

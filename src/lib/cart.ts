@@ -20,7 +20,6 @@ import {
 import { InvalidQuantityError, ProductNotFoundError } from '@/lib/db/errors';
 import { getSession } from '@/lib/auth/session';
 import { NotFoundError } from '@/lib/errors';
-import { siteConfig } from '@/lib/site';
 import { cartWithFullProducts, toCartDTO } from '@/lib/dto';
 import type { CartDTO } from '@/types/api';
 
@@ -62,7 +61,7 @@ async function loadCartDto(cartId: string): Promise<CartDTO> {
   const cart = await getCartWithItems(cartId);
   if (!cart) throw new NotFoundError('Cart not found');
   const full = await cartWithFullProducts(cart);
-  return toCartDTO(full, siteConfig.deliveryFeeCents);
+  return toCartDTO(full);
 }
 
 export async function getCart(): Promise<CartDTO> {
