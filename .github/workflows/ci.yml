@@ -5,11 +5,24 @@
 # Runs on every push / pull request touching `main` (non-fork PRs get
 # secrets; fork-preview PRs get the documented fallbacks below).
 #
-# One job, one linear verification chain mirroring the local workflow
+# One job, one LINEAR verification chain mirroring the local workflow
 # (docs/RUNBOOK.md + runner checkpoints):
 #
-#   npm ci -> prisma generate -> lint -> tsc --noEmit -> vitest -> next build
-#     -> playwright e2e (against a Postgres 16 service container = test DB)
+#   npm ci (its postinstall runs `prisma generate`)
+#     -> prisma generate (idempotent, belt-and-braces)
+#     -> migrate deploy (empty CI postgres -> schema)
+#     -> lint -> tsc --noEmit -> vitest -> next build -> playwright e2e
+#     -> production-config smoke (cash-only shape, `next start`, HTTP probes)
+#
+# ORDERING INVARIANT — this job MUST stay linear:
+#   `npm test` (Vitest) and Playwright must NEVER run concurrently against the
+#   same test DB. tests/integration/actions.test.ts TRUNCATEs tables in its
+#   beforeAll, which would corrupt a simultaneous Playwright run (and vice
+#   versa). Every step here completes before the next starts; do not split
+#   `npm test` and `npx playwright test` into parallel jobs.
+#
+# Test counts (snapshot 2026-10-05; they drift as specs land): Vitest 22
+# files / 369 tests; Playwright 11 specs / 31 tests.
 #
 # Database: a single postgres:16-alpine service container. User/pass/db match
 # docker-compose.yml's `zubeli-postgres-test` exactly, and host port 5435 is
@@ -18,7 +31,20 @@
 #
 # The e2e GLOBAL SETUP (e2e/global-setup.ts) is authoritative for the test
 # DB: it runs `prisma migrate reset --skip-seed` + `prisma db seed` once per
-# run. No migrate/seed step is therefore needed in this workflow.
+# run. No seed step is therefore needed in this workflow.
+#
+# Deterministic, PRODUCTION-SHAPED gate env (why these two, deliberately):
+#   - DEMO_MODE=false -> the Mock payment provider is NOT registered; checkout
+#     behaves like production (pay-on-delivery). (Vitest's tests/setup.ts also
+#     forces false; this makes the e2e app match.)
+#   - PAYMENT_METHODS lists EVERY MVP method explicitly -> the widest
+#     coverage for Vitest + e2e. Do NOT pin the whole run to COD_CASH:
+#     tests/integration/storefront/checkout.test.ts places BANK_TRANSFER and
+#     COD_MOBILE_MONEY orders and would lose coverage. The production
+#     cash-only shape is (a) asserted explicitly by
+#     tests/integration/storefront/payment-allowlist.test.ts and (b) booted by
+#     the "Production-config smoke" step at the bottom of this job.
+#   - TZ=Africa/Kigali -> dashboard revenue day/month bucketing is pinned.
 #
 # Secrets & env vars used by CI (all others, incl. NEXT_PUBLIC_*, have safe
 # code defaults — see .env.example):
@@ -30,9 +56,14 @@
 #     `SESSION_SECRET` (openssl rand -hex 32) to override the fallback.
 #   - DATABASE_URL / TEST_DATABASE_URL — CI postgres service (5435), no secret.
 #
-# Deploy is NOT automatic: this pipeline only verifies (lint/type/test/build).
-# Image build + push + deploy happen via documented manual steps at the
-# hosting milestone (see AGENTS.md "What remains").
+# DEPLOYMENT (CD) is NOT in this file. The production target is Vercel
+# (Hobby) + Neon + Vercel Blob, region fra1. Vercel's own Git integration
+# builds + deploys `main` on push; duplicating that here would add a
+# VERCEL_TOKEN to manage for no gain. Schema migrations run SEPARATELY and
+# manually via `.github/workflows/migrate-production.yml`
+# (workflow_dispatch, Neon unpooled URL secret) — never from the app and
+# never from this verify job. Full procedure: docs/RUNBOOK.md →
+# "Deployment (Vercel + Neon + Blob)".
 # =============================================================================
 
 name: CI
@@ -63,6 +94,14 @@ jobs:
       # but pointed at the ephemeral CI postgres (host port 5435).
       DATABASE_URL: postgresql://zubeli:zubeli@localhost:5435/zubeli_test
       TEST_DATABASE_URL: postgresql://zubeli:zubeli@localhost:5435/zubeli_test
+      # Deterministic, production-shaped gate env (rationale in the header):
+      #   DEMO_MODE=false          -> no Mock provider, production checkout
+      #   PAYMENT_METHODS=<all 3>  -> widest coverage; NOT COD_CASH (that
+      #                               would drop checkout.test.ts cases)
+      #   TZ=Africa/Kigali         -> pinned dashboard bucketing
+      DEMO_MODE: "false"
+      PAYMENT_METHODS: "COD_CASH,COD_MOBILE_MONEY,BANK_TRANSFER"
+      TZ: Africa/Kigali
       # Reserved var (see header comment). Secret-with-fallback:
       #   - same-repo PRs / main pushes -> secrets.SESSION_SECRET when set
       #   - fork PRs / no secret configured -> deterministic placeholder
@@ -98,8 +137,11 @@ jobs:
         run: npm ci
         timeout-minutes: 10
 
-      # Prisma client must exist before tsc (types), seed (e2e global setup)
-      # and build. No postinstall hook generates it.
+      # The Prisma client must exist before tsc (types), migrate deploy and the
+      # e2e seed/build. `npm ci` already runs the package.json `postinstall`
+      # hook (`prisma generate`), so this step is idempotent belt-and-braces:
+      # it guarantees the client on cache hits / fork PRs where postinstall
+      # output may be absent, and makes the dependency order explicit.
       - name: Generate Prisma client
         run: npx prisma generate
 
@@ -154,10 +196,50 @@ jobs:
         timeout-minutes: 10
 
       # global-setup resets + reseeds the test DB once, then the 11 specs /
-      # 29 tests run serial (workers: 1 by design — shared seeded fixture).
+      # 31 tests run serial (workers: 1 by design — shared seeded fixture).
+      # MUST NOT overlap the Vitest step above: actions.test.ts TRUNCATEs the
+      # same shared test DB. This job is linear for exactly that reason.
       - name: E2E (Playwright vs fresh test DB)
         run: npx playwright test
         timeout-minutes: 15
+
+      # ---------------------------------------------------------------------
+      # Production-config smoke (cheap, no browser). The gate above runs the
+      # widest payment allowlist; this boots the cash-only PRODUCTION shape on
+      # the same `next start` server Vercel runs, and doubles as the
+      # documented post-deploy smoke (docs/RUNBOOK.md). No Playwright => no
+      # second e2e run (~10s). Runs after the build so `.next/` exists.
+      # ---------------------------------------------------------------------
+      - name: Production-config smoke (COD_CASH, prod server)
+        env:
+          DEMO_MODE: "false"
+          PAYMENT_METHODS: "COD_CASH"
+          TZ: Africa/Kigali
+        run: |
+          set -euo pipefail
+          npm run start -- -p 3100 >/tmp/zubeli-prod-smoke.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          echo "Waiting for http://localhost:3100/api/health ..."
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:3100/api/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          echo "health: $(curl -fsS http://localhost:3100/api/health)"
+          curl -fsS -o /dev/null -w "GET /          -> %{http_code}\n" http://localhost:3100/
+          curl -fsS -o /dev/null -w "GET /products  -> %{http_code}\n" http://localhost:3100/products
+
+          ADMIN_CODE="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3100/admin)"
+          echo "GET /admin      -> $ADMIN_CODE (guest expects 307)"
+          if [ "$ADMIN_CODE" != "307" ]; then
+            echo "::error::guest /admin returned $ADMIN_CODE, expected 307"
+            cat /tmp/zubeli-prod-smoke.log
+            exit 1
+          fi
 
       - name: Upload Playwright report (on failure)
         if: failure()

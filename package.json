@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "next build",
     "start": "next start",
+    "postinstall": "prisma generate",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -14,15 +15,17 @@
     "test:e2e:headed": "playwright test --headed",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "db:deploy": "prisma migrate deploy"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
-    "next": "15.5.22",
+    "next": "15.5.27",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "server-only": "^0.0.1",
@@ -40,7 +43,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "autoprefixer": "^10",
     "eslint": "^9",
-    "eslint-config-next": "15.5.22",
+    "eslint-config-next": "15.5.27",
     "jsdom": "^30.0.1",
     "postcss": "^8",
     "prisma": "^6.19.3",

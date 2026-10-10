@@ -5,6 +5,9 @@ node_modules/
 .next/
 out/
 
+# vercel CLI local project linkage (created by `vercel link` / `vercel dev`)
+.vercel/
+
 # environment
 .env
 .env.local
