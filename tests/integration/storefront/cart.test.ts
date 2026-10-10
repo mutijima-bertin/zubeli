@@ -11,6 +11,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Category, Product } from "@prisma/client";
+import { expectError, expectOk } from "../../helpers/assert";
 
 // --- mocks ----------------------------------------------------------------
 
@@ -147,6 +148,7 @@ const CATEGORY: Category = {
   slug: "hand-tools",
   name: "Hand Tools",
   description: "Hammers, wrenches, chisels",
+  isActive: true,
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-01-01T00:00:00Z"),
 };
@@ -173,21 +175,6 @@ function productFixture(overrides: Partial<Product> = {}): Product & { category:
   };
 }
 
-function expectOk<T>(result: { ok: boolean; data?: T; error?: { code: string; message: string; details?: unknown } }): T {
-  if (!result.ok || result.data === undefined) {
-    throw new Error(`expected ok result, got ${(result as { error: { code: string } }).error.code}`);
-  }
-  return result.data;
-}
-
-function expectError<T>(result: { ok: boolean; data?: T; error?: { code: string; message: string; details?: unknown } }): {
-  code: string;
-  details?: unknown;
-} {
-  if (result.ok || !result.error) throw new Error("expected error result");
-  return { code: result.error.code, details: result.error.details };
-}
-
 beforeEach(() => {
   m.reset();
   m.clearCookies();
@@ -201,8 +188,8 @@ describe("getCartAction (guest)", () => {
     const cart = expectOk(await getCartAction());
     expect(cart.items).toEqual([]);
     expect(cart.subtotalCents).toBe(0);
-    expect(cart.deliveryFeeCents).toBe(2000); // DELIVERY_FEE_CENTS pinned in tests/setup.ts
-    expect(cart.totalCents).toBe(2000);
+    expect(cart.totalCents).toBe(0);
+    expect(cart).not.toHaveProperty("deliveryFeeCents");
     expect(cart.currency).toBe("RWF");
 
     const token = m.cookieStore["cart_token"];
@@ -221,7 +208,7 @@ describe("addToCartAction", () => {
     expect(cart.items[0]!.quantity).toBe(2);
     expect(cart.items[0]!.lineTotalCents).toBe(30000);
     expect(cart.subtotalCents).toBe(30000);
-    expect(cart.totalCents).toBe(32000);
+    expect(cart.totalCents).toBe(30000); // no delivery fee — total == subtotal
   });
 
   it("caps the quantity at stockQty (99 requested, 10 in stock)", async () => {
@@ -296,7 +283,8 @@ describe("removeCartItemAction", () => {
     const cart = expectOk(await removeCartItemAction({ productId: "p-1" }));
     expect(cart.items).toEqual([]);
     expect(cart.subtotalCents).toBe(0);
-    expect(cart.totalCents).toBe(2000);
+    expect(cart.totalCents).toBe(0); // no delivery fee — empty cart is 0
+    expect(cart).not.toHaveProperty("deliveryFeeCents");
     expect(m.client.cartItem.delete).toHaveBeenCalledOnce();
   });
 

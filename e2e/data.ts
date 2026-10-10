@@ -49,9 +49,6 @@ export const SAFETY_VEST = { slug: "safety-vest", name: "Hi-Vis Safety Vest", pr
 /** Published=false in the seed — must never appear in the catalog. */
 export const UNPUBLISHED_PRODUCT = "Waterproofing Membrane";
 
-/** Delivery fee (DELIVERY_FEE_CENTS=2000 in .env.local / .env.example). */
-export const DELIVERY_FEE_RWF = "2,000 RWF";
-
 /** Guest checkout shipping details (Kigali). */
 export const KIGALI_ADDRESS = {
   name: "E2E Guest",
@@ -69,6 +66,35 @@ export const ORDER_NUMBER_RE = /^ZBL-[0-9A-F]{8}$/;
 
 /** MoMo pay-at-door copy (number comes from site config — keep it robust). */
 export const MOMO_COPY_RE = /Pay at the door via MTN MoMo or Airtel Money/;
+
+/**
+ * The three methods the storefront CAN offer (prisma PaymentMethod enum, the
+ * checkout PAYMENT_OPTIONS catalogue). WHICH of them is offered is
+ * configuration (`PAYMENT_METHODS` → siteConfig.paymentMethods), so specs
+ * discover the real offer from the rendered radios instead of assuming one.
+ */
+export type StorefrontPaymentMethod = "COD_CASH" | "COD_MOBILE_MONEY" | "BANK_TRANSFER";
+
+/**
+ * Customer-facing method badge (src/lib/format.ts PAYMENT_METHOD_META). Stored
+ * per order, so this copy is independent of the current allowlist.
+ */
+export const PAYMENT_BADGE: Record<StorefrontPaymentMethod, string> = {
+  COD_CASH: "Pay on delivery — Cash",
+  COD_MOBILE_MONEY: "Pay on delivery — Mobile Money",
+  BANK_TRANSFER: "Bank transfer",
+};
+
+/**
+ * First "How to pay" instruction for a placed order
+ * (src/lib/payments buildPaymentInstructions). Kept per method so a spec can
+ * assert the confirmation of whichever method it actually placed.
+ */
+export const PAYMENT_INSTRUCTION: Record<StorefrontPaymentMethod, string | RegExp> = {
+  COD_CASH: "Pay in cash when your order arrives.",
+  COD_MOBILE_MONEY: MOMO_COPY_RE,
+  BANK_TRANSFER: /order number ZBL-[0-9A-F]{8} as your transfer reference/,
+};
 
 /** Unique email per registration — the shared DB accumulates users across runs. */
 export function uniqueEmail(prefix = "e2e"): string {

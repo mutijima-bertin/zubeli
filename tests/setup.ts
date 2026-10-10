@@ -48,7 +48,6 @@ const TEST_DATABASE_URL =
 process.env.TEST_DATABASE_URL = TEST_DATABASE_URL;
 process.env.DATABASE_URL = TEST_DATABASE_URL; // never the dev DB (5434)
 process.env.BCRYPT_ROUNDS = "4"; // keep bcrypt fast in tests
-process.env.DELIVERY_FEE_CENTS = "2000";
 process.env.NEXT_PUBLIC_CURRENCY = "RWF";
 process.env.SHOP_MOMO_NUMBER = "+250700000000";
 process.env.BANK_TRANSFER_DETAILS = "Bank of Kigali—Zubeli Company Ltd—1001001001";

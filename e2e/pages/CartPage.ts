@@ -46,10 +46,9 @@ export class CartPage {
     await expect(this.lineRow(name).getByText(amount, { exact: true })).toBeVisible();
   }
 
-  async expectSummary(summary: { subtotal: string; delivery: string; total: string }): Promise<void> {
+  async expectSummary(summary: { subtotal: string; total: string }): Promise<void> {
     await expect(this.page.getByText("Order summary")).toBeVisible();
     await expect(this.page.getByText(summary.subtotal, { exact: true }).first()).toBeVisible();
-    await expect(this.page.getByText(summary.delivery, { exact: true })).toBeVisible();
     await expect(this.page.getByText(summary.total, { exact: true }).first()).toBeVisible();
   }
 

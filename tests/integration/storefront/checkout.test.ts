@@ -15,6 +15,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revalidatePath } from "next/cache";
 import type { Category, Product } from "@prisma/client";
+import { expectError, expectOk } from "../../helpers/assert";
 
 // --- mocks ----------------------------------------------------------------
 
@@ -88,7 +89,6 @@ const m = vi.hoisted(() => {
           customerAddress: data.customerAddress as string,
           customerCity: (data.customerCity as string | null) ?? null,
           subtotalCents: data.subtotalCents as number,
-          deliveryFeeCents: data.deliveryFeeCents as number,
           totalCents: data.totalCents as number,
           currency: data.currency as string,
           bankTransferReference: (data.bankTransferReference as string | null) ?? null,
@@ -251,6 +251,7 @@ const CATEGORY: Category = {
   slug: "hand-tools",
   name: "Hand Tools",
   description: "Hammers, wrenches, chisels",
+  isActive: true,
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-01-01T00:00:00Z"),
 };
@@ -286,21 +287,6 @@ async function cartWithItems(items: { productId: string; quantity: number }[]) {
   m.seedCart(items);
 }
 
-function expectOk<T>(result: { ok: boolean; data?: T; error?: { code: string; message: string; details?: unknown } }): T {
-  if (!result.ok || result.data === undefined) {
-    throw new Error(`expected ok result, got ${(result as { error: { code: string } }).error.code}`);
-  }
-  return result.data;
-}
-
-function expectError<T>(result: { ok: boolean; data?: T; error?: { code: string; message: string; details?: unknown } }): {
-  code: string;
-  details?: unknown;
-} {
-  if (result.ok || !result.error) throw new Error("expected error result");
-  return { code: result.error.code, details: result.error.details };
-}
-
 beforeEach(() => {
   m.reset();
   m.clearCookies();
@@ -310,10 +296,10 @@ beforeEach(() => {
 // --- tests ----------------------------------------------------------------
 
 describe("getCheckoutCartAction", () => {
-  it("returns the empty guest cart with only the delivery fee", async () => {
+  it("returns the empty guest cart", async () => {
     const cart = expectOk(await getCheckoutCartAction());
     expect(cart.items).toEqual([]);
-    expect(cart.totalCents).toBe(2000);
+    expect(cart.totalCents).toBe(0); // no delivery fee — empty cart is 0
     expect(m.cookieStore["cart_token"]).toBeTruthy(); // guest cookie created
   });
 });
@@ -330,13 +316,12 @@ describe("createOrderAction", () => {
     expect(order.method).toBe("COD_CASH");
     expect(order.number).toMatch(/^ZBL-/);
     expect(order.subtotalCents).toBe(30000);
-    expect(order.deliveryFeeCents).toBe(2000);
-    expect(order.totalCents).toBe(32000);
+    expect(order.totalCents).toBe(30000); // no delivery fee — total == subtotal
     expect(order.customerName).toBe("Umutoni");
     expect(order.items).toEqual([
       expect.objectContaining({ productName: "Claw Hammer", unitPriceCents: 15000, quantity: 2, lineTotalCents: 30000 }),
     ]);
-    expect(order.payment).toMatchObject({ method: "COD_CASH", status: "PENDING", amountCents: 32000 });
+    expect(order.payment).toMatchObject({ method: "COD_CASH", status: "PENDING", amountCents: 30000 });
     expect(paymentInstructions).toEqual({ title: "Cash on delivery", steps: ["Pay in cash when your order arrives."] });
 
     // Real transaction effects: stock decremented, cart cleared, revalidation
@@ -425,8 +410,7 @@ describe("getCheckoutOrderAction (public success-page lookup)", () => {
       customerAddress: "KN 5 Rd, Kigali",
       customerCity: "Kigali",
       subtotalCents: 30000,
-      deliveryFeeCents: 2000,
-      totalCents: 32000,
+      totalCents: 30000,
       currency: "RWF",
       bankTransferReference: null,
       idempotencyKey: "cart-1",
@@ -452,7 +436,7 @@ describe("getCheckoutOrderAction (public success-page lookup)", () => {
         orderId: "order-1",
         method: "BANK_TRANSFER",
         status: "PENDING",
-        amountCents: 32000,
+        amountCents: 30000,
         currency: "RWF",
         confirmedById: null,
         confirmedAt: null,
@@ -470,7 +454,7 @@ describe("getCheckoutOrderAction (public success-page lookup)", () => {
     expect(order.id).toBe("order-1");
     expect(order.number).toBe("ZBL-00000001");
     expect(order.status).toBe("PENDING");
-    expect(order.totalCents).toBe(32000);
+    expect(order.totalCents).toBe(30000);
     expect(order.items[0]!.lineTotalCents).toBe(30000);
     // buildPaymentInstructions: the ORDER NUMBER is the transfer reference.
     expect(paymentInstructions).toEqual({

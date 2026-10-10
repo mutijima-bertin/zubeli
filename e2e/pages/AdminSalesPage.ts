@@ -50,14 +50,45 @@ export class AdminSalesPage {
     await expect(table.getByText(/RWF/).first()).toBeVisible();
   }
 
-  /** Drive the period form: fill From/To and Apply, then await the URL. */
+  /**
+   * Drive the period form: fill From/To and Apply, then await the URL.
+   *
+   * The URL assertion is the contract: the applied period must reach the query
+   * string, not merely any from/to pair.
+   *
+   * Hydration race (why this retries instead of just filling once):
+   * PeriodFilterForm is a client component with CONTROLLED inputs. A `fill`
+   * that lands before React hydrates changes the DOM value without committing
+   * state, and hydration then adopts that DOM value as the controlled value —
+   * so `Apply` submits the period already in the URL (the handler early-returns
+   * when state equals the props) and the query string never changes. Retrying
+   * the whole cycle recovers as soon as React is live. Each attempt clears the
+   * field first so the fill always carries a delta (React's value tracker
+   * suppresses a change event with no delta). The asserted URL values are
+   * unchanged by this, and there are no sleeps.
+   */
   async applyPeriod(from: string, to: string): Promise<void> {
     // exact: the bare substrings would also match aria-labels like
     // "Top products by revenue" and "Open Next.js Dev Tools".
-    await this.page.getByLabel("From", { exact: true }).fill(from);
-    await this.page.getByLabel("To", { exact: true }).fill(to);
-    await this.page.getByRole("button", { name: "Apply", exact: true }).click();
-    await expect(this.page).toHaveURL(/[\?&]from=.*[\?&]to=/);
+    const fromInput = this.page.getByLabel("From", { exact: true });
+    const toInput = this.page.getByLabel("To", { exact: true });
+    const apply = this.page.getByRole("button", { name: "Apply", exact: true });
+
+    await expect(fromInput).toBeVisible();
+
+    await expect(async () => {
+      await fromInput.fill("");
+      await fromInput.fill(from);
+      await toInput.fill("");
+      await toInput.fill(to);
+      // Both controlled values are committed before Apply is clicked.
+      await expect(fromInput).toHaveValue(from);
+      await expect(toInput).toHaveValue(to);
+      await apply.click();
+      await expect(this.page).toHaveURL(
+        (url) => url.searchParams.get("from") === from && url.searchParams.get("to") === to,
+      );
+    }).toPass({ timeout: 15_000 });
   }
 
   /** FilterBar period summary echoes the selected range (en-GB dates). */

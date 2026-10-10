@@ -21,8 +21,12 @@ test.use({ storageState: OWNER_SESSION_PATH });
  * 1. List: seeded orders render with the right status chips; URL filters work.
  * 2. BANK_TRANSFER PENDING order: Confirm payment (no extra reference step —
  *    stored on the order) -> PAID persists across reload -> Fulfill -> FULFILLED.
+ *    The seeded row is read back from the DB, so it renders under any
+ *    PAYMENT_METHODS allowlist (badges/instructions come from the order's
+ *    stored method, not from what the storefront currently offers).
  * 3. A dedicated fresh storefront order is cancelled and restocked — state is
- *    consumed in-spec so sibling specs never see mutated seed rows.
+ *    consumed in-spec so sibling specs never see mutated seed rows. This one
+ *    goes through the payment step, so it is guarded by the rendered offer.
  */
 test.describe("Admin — orders", () => {
   test("orders list shows seeded statuses and URL filters", async ({ page }) => {
@@ -105,6 +109,11 @@ test.describe("Admin — orders", () => {
       address: "KN 5 St, Nyarugenge",
       city: "Kigali",
     });
+    // This order is placed through the STOREFRONT, so it is subject to the
+    // configurable PAYMENT_METHODS allowlist like any customer order. Cash is
+    // the picker's guaranteed fallback; skip honestly if even that is gone.
+    const offered = await checkout.availablePaymentMethods();
+    test.skip(!offered.includes("COD_CASH"), checkout.skipReasonFor("COD_CASH", offered));
     await checkout.selectPayment("COD_CASH");
     await checkout.placeOrder();
 

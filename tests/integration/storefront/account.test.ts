@@ -10,6 +10,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session, User } from "@prisma/client";
+import { expectError, expectOk } from "../../helpers/assert";
 
 // --- mocks ----------------------------------------------------------------
 
@@ -185,21 +186,6 @@ function listRowFixture(id: string, overrides: Record<string, unknown> = {}) {
     payment: { method: "COD_CASH", status: "PENDING" },
     ...overrides,
   };
-}
-
-function expectOk<T>(result: { ok: boolean; data?: T; error?: { code: string; message: string; details?: unknown } }): T {
-  if (!result.ok || result.data === undefined) {
-    throw new Error(`expected ok result, got ${(result as { error: { code: string } }).error.code}`);
-  }
-  return result.data;
-}
-
-function expectError<T>(result: { ok: boolean; data?: T; error?: { code: string; message: string; details?: unknown } }): {
-  code: string;
-  details?: unknown;
-} {
-  if (result.ok || !result.error) throw new Error("expected error result");
-  return { code: result.error.code, details: result.error.details };
 }
 
 beforeEach(() => {

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { dateDaysAgoInput } from "../data";
+import { dateDaysAgoInput, ORDER_NUMBER_RE } from "../data";
 import { OWNER_SESSION_PATH } from "../admin-session";
 import { AdminSalesPage } from "../pages/AdminSalesPage";
 
@@ -27,7 +27,8 @@ test.describe("Admin — sales", () => {
     }
     await sales.expectChart();
     await sales.expectTopProducts();
-    await sales.expectRecentOrders(/ZBL-[0-9]{8}/);
+    // Order numbers are ZBL- + 8 HEX chars (shared regex in ../data).
+    await sales.expectRecentOrders(ORDER_NUMBER_RE);
   });
 
   test("sales report honors ?from&to and the period form updates the URL", async ({ page }) => {
@@ -53,9 +54,10 @@ test.describe("Admin — sales", () => {
       (url) => url.searchParams.get("from") === from80 && url.searchParams.get("to") === today,
     );
 
-    // FilterBar echoes the applied range as "X — Y" (en-GB date format).
+    // FilterBar echoes the applied range as "X — Y" (en-GB date format; note
+    // en-GB abbreviates September as "Sept" — 4 letters, hence {2,3}).
     await expect(
-      page.getByText(/\d{1,2} \w{3} \d{4} — \d{1,2} \w{3} \d{4}/).first(),
+      page.getByText(/\d{1,2} [A-Z][a-z]{2,3} \d{4} — \d{1,2} [A-Z][a-z]{2,3} \d{4}/).first(),
     ).toBeVisible();
   });
 });

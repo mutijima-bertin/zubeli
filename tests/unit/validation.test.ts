@@ -17,6 +17,7 @@ import {
   registerSchema,
 } from "@/lib/validation/auth";
 import { cartItemSchema, removeCartItemSchema } from "@/lib/validation/cart";
+import { createCategorySchema, updateCategorySchema } from "@/lib/validation/category";
 import { checkoutSchema } from "@/lib/validation/checkout";
 import {
   adminListOrdersSchema,
@@ -275,6 +276,38 @@ describe("productSchema", () => {
     expect(result.success).toBe(true);
     expectRejected(adminUpdateProductSchema, { priceCents: 100 }, "productId");
     expectRejected(adminUpdateProductSchema, { productId: "p1", priceCents: -2 }, "priceCents");
+  });
+});
+
+describe("category schemas", () => {
+  it("createCategorySchema is strict — unknown keys are rejected, not stripped", () => {
+    expect(createCategorySchema.safeParse({ name: "Power Tools" }).success).toBe(true);
+    expectRejected(createCategorySchema, { name: "Power Tools", evil: true });
+  });
+
+  it("updateCategorySchema is strict — unknown keys are rejected, not stripped", () => {
+    expect(updateCategorySchema.safeParse({ name: "Power Tools" }).success).toBe(true);
+    expectRejected(updateCategorySchema, { name: "Power Tools", evil: true });
+  });
+
+  it("derives the slug from the name and re-validates it (1-char derived slug rejected)", () => {
+    const derived = createCategorySchema.safeParse({ name: "Power Tools & Drills" });
+    expect(derived.success).toBe(true);
+    if (derived.success) expect(derived.data.slug).toBe("power-tools-drills");
+
+    // "-a" clears the 2-char name floor but slugifies to the 1-char "a".
+    expectRejected(createCategorySchema, { name: "-a" }, "slug");
+  });
+
+  it("update without a slug never derives one from the new name", () => {
+    const result = updateCategorySchema.safeParse({ name: "Renamed Category" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe("Renamed Category");
+      // Slug stays untouched in the DB (covered end-to-end in
+      // tests/integration/admin-categories.test.ts).
+      expect(result.data).not.toHaveProperty("slug");
+    }
   });
 });
 

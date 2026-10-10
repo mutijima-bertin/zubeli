@@ -59,8 +59,7 @@ function makeCart(id: string, quantities: number[]): CartDTO {
       },
     })),
     subtotalCents: 1000 * quantities.reduce((a, b) => a + b, 0),
-    deliveryFeeCents: 2000,
-    totalCents: 1000 * quantities.reduce((a, b) => a + b, 0) + 2000,
+    totalCents: 1000 * quantities.reduce((a, b) => a + b, 0),
     currency: "RWF",
   };
 }

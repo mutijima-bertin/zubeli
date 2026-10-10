@@ -22,7 +22,7 @@ vi.mock("@/lib/db/categories", () => ({
 }));
 
 vi.mock("@/lib/site", () => ({
-  siteConfig: { deliveryFeeCents: 2000 },
+  siteConfig: {},
 }));
 
 import { listAll } from "@/lib/db/categories";
@@ -74,8 +74,8 @@ const PRODUCTS: ProductCard[] = [
 ];
 
 const CATEGORIES: CategoryWithCount[] = [
-  { id: "cat-1", name: "Power Tools", slug: "power-tools", description: null, productCount: 5 },
-  { id: "cat-2", name: "Safety", slug: "safety", description: null, productCount: 3 },
+  { id: "cat-1", name: "Power Tools", slug: "power-tools", productCount: 5 },
+  { id: "cat-2", name: "Safety", slug: "safety", productCount: 3 },
 ];
 
 beforeEach(() => {
@@ -85,7 +85,7 @@ beforeEach(() => {
 // --- getHomepageData ---------------------------------------------------------
 
 describe("getHomepageData", () => {
-  it("maps featured products to cards and returns categories + delivery fee", async () => {
+  it("maps featured products to cards and returns categories", async () => {
     getFeaturedM.mockResolvedValue(PRODUCTS);
     listAllM.mockResolvedValue(CATEGORIES);
 
@@ -99,7 +99,7 @@ describe("getHomepageData", () => {
       category: { slug: "power-tools", name: "Power Tools" },
     });
     expect(data.categories).toBe(CATEGORIES); // passthrough
-    expect(data.deliveryFeeCents).toBe(2000);
+    expect(data).not.toHaveProperty("deliveryFeeCents");
     expect(getFeaturedM).toHaveBeenCalledWith(8);
   });
 });
@@ -316,6 +316,7 @@ describe("getProductDetail", () => {
         slug: "power-tools",
         name: "Power Tools",
         description: "Drills and saws",
+        isActive: true,
         createdAt: new Date("2026-01-01T00:00:00Z"),
         updatedAt: new Date("2026-01-01T00:00:00Z"),
       },

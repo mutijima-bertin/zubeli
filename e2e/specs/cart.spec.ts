@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { ANGLE_GRINDER, DELIVERY_FEE_RWF } from "../data";
+import { ANGLE_GRINDER } from "../data";
 import { CartPage } from "../pages/CartPage";
 import { ProductPage } from "../pages/ProductPage";
 
@@ -16,7 +16,7 @@ test.describe("Cart", () => {
     await product.addToCart();
     await product.expectBadge(2);
 
-    // Cart line: name, quantity, line total (2 × 65,000), summary incl. RWF delivery.
+    // Cart line: name, quantity, line total (2 × 65,000), summary subtotal = total (no delivery fee).
     const cart = new CartPage(page);
     await cart.goto();
     await cart.expectLine(ANGLE_GRINDER.name);
@@ -24,8 +24,7 @@ test.describe("Cart", () => {
     await cart.expectLineTotal(ANGLE_GRINDER.name, "130,000 RWF");
     await cart.expectSummary({
       subtotal: "130,000 RWF",
-      delivery: DELIVERY_FEE_RWF,
-      total: "132,000 RWF",
+      total: "130,000 RWF",
     });
     await cart.expectBadge(2);
 

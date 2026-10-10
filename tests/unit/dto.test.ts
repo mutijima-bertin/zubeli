@@ -58,6 +58,7 @@ function categoryFixture(overrides: Partial<Category> = {}): Category {
     name: "Hand Tools",
     slug: "hand-tools",
     description: null,
+    isActive: true,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -105,7 +106,7 @@ function paymentFixture(overrides: Partial<Payment> = {}): Payment {
     orderId: "order-1",
     method: "COD_CASH",
     status: "PENDING",
-    amountCents: 32000,
+    amountCents: 30000,
     currency: "RWF",
     providerPaymentId: null,
     confirmedById: null,
@@ -142,8 +143,7 @@ function orderFixture(overrides: Partial<Order> = {}): Order {
     customerAddress: "KN 5 Rd, Kigali",
     customerCity: "Kigali",
     subtotalCents: 30000,
-    deliveryFeeCents: 2000,
-    totalCents: 32000,
+    totalCents: 30000,
     currency: "RWF",
     bankTransferReference: null,
     idempotencyKey: "cart-1",
@@ -228,20 +228,21 @@ describe("cart mappers", () => {
     });
   });
 
-  it("toCartDTO sums subtotal and total including the delivery fee", () => {
-    const dto = toCartDTO(
-      { id: "cart-1", items: [fullItem(), fullItem({ id: "ci-2", quantity: 1, product: { ...productFixture({ id: "prod-2", priceCents: 8000 }), category: categoryFixture() } })] },
-      2000,
-    );
+  it("toCartDTO derives totalCents equal to subtotalCents (no delivery fee)", () => {
+    const dto = toCartDTO({
+      id: "cart-1",
+      items: [fullItem(), fullItem({ id: "ci-2", quantity: 1, product: { ...productFixture({ id: "prod-2", priceCents: 8000 }), category: categoryFixture() } })],
+    });
     expect(dto.subtotalCents).toBe(30000 + 8000);
-    expect(dto.deliveryFeeCents).toBe(2000);
-    expect(dto.totalCents).toBe(40000);
+    expect(dto.totalCents).toBe(30000 + 8000);
     expect(dto.currency).toBe("RWF");
+    expect(dto).not.toHaveProperty("deliveryFeeCents");
   });
 
-  it("toCartDTO handles an empty cart (subtotal 0, currency falls back to RWF)", () => {
-    const dto = toCartDTO({ id: "cart-1", items: [] }, 2000);
-    expect(dto).toEqual({ id: "cart-1", items: [], subtotalCents: 0, deliveryFeeCents: 2000, totalCents: 2000, currency: "RWF" });
+  it("toCartDTO handles an empty cart (subtotal 0, total 0, currency falls back to RWF)", () => {
+    const dto = toCartDTO({ id: "cart-1", items: [] });
+    expect(dto).toEqual({ id: "cart-1", items: [], subtotalCents: 0, totalCents: 0, currency: "RWF" });
+    expect(dto).not.toHaveProperty("deliveryFeeCents");
   });
 
   it("cartWithFullProducts re-fetches products and drops items whose product vanished", async () => {
@@ -284,7 +285,7 @@ describe("order mappers", () => {
       orderId: "order-1",
       method: "COD_CASH",
       status: "PENDING",
-      amountCents: 32000,
+      amountCents: 30000,
       currency: "RWF",
       confirmedById: "admin-1",
       confirmedAt: "2026-08-05T10:00:00.000Z",
@@ -314,8 +315,7 @@ describe("order mappers", () => {
       status: "PAID",
       method: "BANK_TRANSFER",
       subtotalCents: 30000,
-      deliveryFeeCents: 2000,
-      totalCents: 32000,
+      totalCents: 30000,
       currency: "RWF",
       customerName: "Umutoni Alice",
       customerPhone: "+250788123456",

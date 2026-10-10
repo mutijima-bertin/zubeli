@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * Catalog /products (owner: catalog-agent). Search, category filters,

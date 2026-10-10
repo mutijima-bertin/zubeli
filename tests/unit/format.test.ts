@@ -48,6 +48,17 @@ describe("date formatting", () => {
     expect(formatDateTime("2026-08-05T10:30:00.000Z")).toMatch(/\d{2}:\d{2}/);
   });
 
+  it("projects instants into BUSINESS_TIME_ZONE (Africa/Kigali), not the runtime zone", () => {
+    // 23:30 UTC is already the next calendar day in Kigali (UTC+2, no DST), and
+    // 21:45 UTC is still the same day. These exact strings fail if the
+    // timeZone pin is dropped on a UTC runtime (the production zone) — the loose
+    // /Aug/ assertions above cannot catch that.
+    expect(formatDate("2026-08-05T23:30:00.000Z")).toBe("6 Aug 2026");
+    expect(formatDate("2026-08-05T21:45:00.000Z")).toBe("5 Aug 2026");
+    expect(formatDateTime("2026-08-05T23:30:00.000Z")).toBe("6 Aug 2026, 01:30");
+    expect(formatDateTime("2026-08-05T10:30:00.000Z")).toBe("5 Aug 2026, 12:30");
+  });
+
   it("is null-safe", () => {
     expect(formatDate(null)).toBe("—");
     expect(formatDate(undefined)).toBe("—");

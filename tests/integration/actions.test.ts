@@ -4,10 +4,17 @@
  *
  * Isolation strategy:
  * - beforeAll truncates every table the suite touches (Order, OrderItem,
- *   Payment, InventoryMovement, Cart, CartItem, Session) and removes test-*
- *   users, then creates its own fixtures (category, products, OWNER admin +
+ *   Payment, InventoryMovement, Cart, CartItem) and removes test-* users,
+ *   then creates its own fixtures (category, products, OWNER admin +
  *   session, CUSTOMER user) with a unique run suffix. afterAll removes the
  *   fixtures and truncates the transactional tables again.
+ *   Session rows are the one exception: they are deleted by namespace (users
+ *   with a `test-` email), NEVER table-truncated — see the comment on
+ *   truncateTransactionalTables for the cross-worker flake that caused.
+ * - beforeAll ALSO clears this file's rate-limit buckets (scoped DELETE on the
+ *   mocked test IP, see clearRateLimitBuckets): the limiter is Postgres-backed
+ *   and the mocked x-forwarded-for is a constant, so `register:203.0.113.7`
+ *   persisted between runs and drained the 5/hour register budget.
  * - next/headers is mocked so session/cart identity flows through an
  *   in-memory cookie store (this is how admin actions see the OWNER session:
  *   a session row is inserted into the test DB keyed by sha256(token), and the
@@ -22,16 +29,20 @@ import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { hashSync } from "bcryptjs";
-import type { ActionResult } from "@/types/api";
+import { expectError, expectOk } from "../helpers/assert";
 
 // --- next/headers + next/cache mocks ----------------------------------------
 
 const req = vi.hoisted(() => {
   const cookieStore: Record<string, string> = {};
   const setCalls: { name: string; value: string; options?: Record<string, unknown> }[] = [];
+  // Constant test IP — the mocked x-forwarded-for value. Rate-limit keys are
+  // built from it, so it is also the cleanup key prefix (see clearRateLimitBuckets).
+  const TEST_IP = "203.0.113.7";
   return {
     cookieStore,
     setCalls,
+    TEST_IP,
     setCookie: (name: string, value: string) => {
       cookieStore[name] = value;
     },
@@ -48,7 +59,7 @@ const req = vi.hoisted(() => {
         delete cookieStore[name];
       },
     }),
-    headers: async () => ({ get: (key: string) => (key === "x-forwarded-for" ? "203.0.113.7" : null) }),
+    headers: async () => ({ get: (key: string) => (key === "x-forwarded-for" ? TEST_IP : null) }),
   };
 });
 
@@ -90,23 +101,58 @@ const CUSTOMER_PAYLOAD = {
   city: "Kigali",
 };
 
-function expectOk<T>(result: ActionResult<T>): T {
-  expect(result.ok).toBe(true);
-  if (!result.ok) throw new Error(`expected ok result, got ${result.error.code}: ${result.error.message}`);
-  return result.data;
-}
-
-function expectError<T>(result: ActionResult<T>): { code: string; message?: string } {
-  expect(result.ok).toBe(false);
-  if (result.ok) throw new Error("expected error result");
-  return { code: result.error.code, message: result.error.message };
-}
-
+/**
+ * Clear the transactional tables this file owns — plus its OWN leftover rows.
+ *
+ * Session is deliberately NOT in the TRUNCATE list (fixed 2026-10-05):
+ * `TRUNCATE "Session"` is table-wide, and vitest runs test FILES in parallel
+ * against ONE database. A concurrent worker's session bootstrap (e.g.
+ * admin-categories.test.ts `ensureSessions()` upsert) could land inside that
+ * truncation window: the upsert reported success and the row was gone by the
+ * time the authenticated action ran, so the action returned
+ * `NOT_AUTHORIZED` and the test failed — a flake that fired ~2/20 full-suite
+ * runs and could not be reproduced solo (maxWorkers:1 hides it).
+ *
+ * The invariant this now enforces: NO worker's teardown can delete a session
+ * row another worker just created. Sessions are therefore deleted by
+ * OWNERSHIP NAMESPACE instead — only rows whose user carries this file's
+ * `test-` email prefix. admin-categories uses `cat-owner-`/`cat-customer-`,
+ * rate-limit.test.ts only ever touches RateLimitBucket rows (its own
+ * `rate-limit-test:` key prefix), and nothing else in tests/ writes Session
+ * rows; no other worker's sessions are reachable from here.
+ */
 async function truncateTransactionalTables() {
   await db.$executeRawUnsafe(
-    'TRUNCATE "Payment", "OrderItem", "Order", "InventoryMovement", "CartItem", "Cart", "Session" CASCADE',
+    'TRUNCATE "Payment", "OrderItem", "Order", "InventoryMovement", "CartItem", "Cart" CASCADE',
   );
+  // Scoped session cleanup (see block comment above): this file's users only.
+  // Runs BEFORE the user delete so Session rows never dangle, and it also
+  // sweeps stale `test-` sessions left by previous runs of this file.
+  await db.session.deleteMany({ where: { user: { email: { contains: "test-" } } } });
   await db.user.deleteMany({ where: { email: { contains: "test-" } } });
+}
+
+/**
+ * Drop the rate-limit buckets this file's actions consume.
+ *
+ * The limiter (src/lib/rate-limit.ts) is Postgres-backed, and its keys are built
+ * from `clientIp()`. This file mocks `x-forwarded-for` to the CONSTANT
+ * `203.0.113.7`, so `register:203.0.113.7` is the SAME bucket on every run
+ * against the long-lived test DB (5435) — `RATE_LIMITS.register` is 5/hour, and
+ * this file calls `registerAction` 3x per run, so the second/third run drained
+ * it and failed with RATE_LIMITED (observed 2026-10-05).
+ *
+ * Scoped raw DELETE, not `TRUNCATE "RateLimitBucket"`: vitest runs test FILES
+ * in parallel workers against ONE database, and
+ * tests/integration/rate-limit.test.ts owns its own buckets
+ * (`rate-limit-test:<pid>:*`) while it runs. A table-wide TRUNCATE from this
+ * file would delete those rows mid-test and make that suite flaky. Deleting
+ * only the keys this file's mocked IP can produce leaves that isolation intact.
+ */
+async function clearRateLimitBuckets() {
+  await db.$executeRawUnsafe(
+    `DELETE FROM "RateLimitBucket" WHERE "key" LIKE 'register:${req.TEST_IP}' OR "key" LIKE 'login:${req.TEST_IP}:%' OR "key" LIKE 'checkout:${req.TEST_IP}:%'`,
+  );
 }
 
 async function createGuestCart(items: { productId: string; quantity: number }[]) {
@@ -129,7 +175,7 @@ async function createOrderDirect(opts: {
   const products = await db.product.findMany({ where: { id: { in: items.map((i) => i.productId) } } });
   const byId = new Map(products.map((p) => [p.id, p]));
   const subtotal = items.reduce((sum, i) => sum + (byId.get(i.productId)?.priceCents ?? 0) * i.quantity, 0);
-  const total = subtotal + 2000; // DELIVERY_FEE_CENTS pinned in tests/setup.ts
+  const total = subtotal; // no delivery fee — total == subtotal
   seq += 1;
   return db.order.create({
     data: {
@@ -142,7 +188,6 @@ async function createOrderDirect(opts: {
       customerAddress: CUSTOMER_PAYLOAD.address,
       customerCity: CUSTOMER_PAYLOAD.city,
       subtotalCents: subtotal,
-      deliveryFeeCents: 2000,
       totalCents: total,
       bankTransferReference: opts.bankTransferReference ?? null,
       payment: {
@@ -165,6 +210,7 @@ async function createOrderDirect(opts: {
 
 beforeAll(async () => {
   await truncateTransactionalTables();
+  await clearRateLimitBuckets();
 
   const category = await db.category.create({
     data: { name: `Test Tools ${RUN}`, slug: `test-cat-${RUN}` },
@@ -209,6 +255,23 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await truncateTransactionalTables();
+  await clearRateLimitBuckets();
+  // Owner notifications emitted by this file are addressed to the SEED owner
+  // accounts (notifyOwners fans out to every OWNER row), so the `test-` user
+  // sweep below never reaches them: +6 Notification rows leaked into 5435 on
+  // every run. Two precise sweeps — deliberately NOT a time-window delete,
+  // because other agents share this database and a time window would take
+  // their rows too:
+  //  (a) order notifications whose order is already gone (this file truncates
+  //      Order above, so every order this run created is now dangling) —
+  //      runs last so it also self-heals earlier leaks;
+  //  (b) notifications carrying this run's RUN stamp in the copy (LOW_STOCK
+  //      links to /admin/stock, so it has no order id to match on — its title
+  //      is `Low stock: Test Hammer <RUN>`).
+  await db.$executeRawUnsafe(
+    `DELETE FROM "Notification" WHERE "link" LIKE '/admin/orders/%' AND substring("link" from 15) NOT IN (SELECT id FROM "Order")`,
+  );
+  await db.notification.deleteMany({ where: { OR: [{ title: { contains: RUN } }, { body: { contains: RUN } }] } });
   await db.product.deleteMany({ where: { slug: { startsWith: "test-" } } });
   await db.category.deleteMany({ where: { slug: { startsWith: "test-" } } });
   await db.$disconnect();
@@ -270,7 +333,7 @@ describe("cart actions (guest)", () => {
     const cart = expectOk(await getCartAction());
     expect(cart.items).toEqual([]);
     expect(cart.subtotalCents).toBe(0);
-    expect(cart.totalCents).toBe(2000); // delivery fee only
+    expect(cart.totalCents).toBe(0); // no delivery fee — total == subtotal
     // the server set the guest cookie and persisted the cart row
     const token = req.cookieStore["cart_token"];
     expect(token).toBeTruthy();
@@ -319,10 +382,9 @@ describe("createOrderAction — guest checkout", () => {
     expect(order.method).toBe("COD_CASH");
     expect(order.number).toMatch(/^ZBL-/);
     expect(order.subtotalCents).toBe(30000);
-    expect(order.deliveryFeeCents).toBe(2000);
-    expect(order.totalCents).toBe(32000);
+    expect(order.totalCents).toBe(30000); // no delivery fee — total == subtotal
     expect(order.customerEmail).toBe(CUSTOMER_EMAIL);
-    expect(order.payment).toMatchObject({ method: "COD_CASH", status: "PENDING", amountCents: 32000 });
+    expect(order.payment).toMatchObject({ method: "COD_CASH", status: "PENDING", amountCents: 30000 });
     expect(paymentInstructions).toEqual({ title: "Cash on delivery", steps: ["Pay in cash when your order arrives."] });
 
     // DB: order + PENDING payment + snapshot items
