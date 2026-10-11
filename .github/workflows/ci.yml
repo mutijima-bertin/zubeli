@@ -11,8 +11,24 @@
 #   npm ci (its postinstall runs `prisma generate`)
 #     -> prisma generate (idempotent, belt-and-braces)
 #     -> migrate deploy (empty CI postgres -> schema)
-#     -> lint -> tsc --noEmit -> vitest -> next build -> playwright e2e
+#     -> lint -> tsc --noEmit -> vitest -> next build
 #     -> production-config smoke (cash-only shape, `next start`, HTTP probes)
+#     -> playwright e2e
+#
+# SMOKE ORDERING (regression fix 2026-10-11): the production-config smoke runs
+#   IMMEDIATELY AFTER the build and BEFORE Playwright. `npm run dev` (the
+#   Playwright webServer) rewrites `.next` with a DEV-shaped
+#   routes-manifest.json that has no `dataRoutes`; a `next start` afterwards
+#   then crashes with "[TypeError: routesManifest.dataRoutes is not iterable]"
+#   and never binds its port (the old failure: first probe died `curl` exit 7).
+#   Running the smoke against the pristine build is both correct — it tests the
+#   real production artifact — and avoids paying for a second `next build`.
+#
+# ACTIONS RUNTIME (2026-10-11): checkout/setup-node/cache are pinned to v5 and
+#   upload-artifact to v6 — the oldest majors that run on Node 24 — to clear
+#   the Node-20 deprecation warnings. Verified against the GitHub API and each
+#   action.yml (`runs.using: node24`). GitHub-hosted ubuntu-latest satisfies
+#   their minimum runner (>= v2.327.1).
 #
 # ORDERING INVARIANT — this job MUST stay linear:
 #   `npm test` (Vitest) and Playwright must NEVER run concurrently against the
@@ -43,7 +59,7 @@
 #     COD_MOBILE_MONEY orders and would lose coverage. The production
 #     cash-only shape is (a) asserted explicitly by
 #     tests/integration/storefront/payment-allowlist.test.ts and (b) booted by
-#     the "Production-config smoke" step at the bottom of this job.
+#     the "Production-config smoke" step right after the build (before e2e).
 #   - TZ=Africa/Kigali -> dashboard revenue day/month bucketing is pinned.
 #
 # Secrets & env vars used by CI (all others, incl. NEXT_PUBLIC_*, have safe
@@ -124,10 +140,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node 22 (npm cache)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -161,7 +177,7 @@ jobs:
         run: npx prisma migrate deploy
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: pw-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -170,7 +186,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Cache Next.js build cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .next/cache
           # Lockfile-only key: Next cache survives when only source changes;
@@ -195,39 +211,58 @@ jobs:
         run: npm run build
         timeout-minutes: 10
 
-      # global-setup resets + reseeds the test DB once, then the 11 specs /
-      # 31 tests run serial (workers: 1 by design — shared seeded fixture).
-      # MUST NOT overlap the Vitest step above: actions.test.ts TRUNCATEs the
-      # same shared test DB. This job is linear for exactly that reason.
-      - name: E2E (Playwright vs fresh test DB)
-        run: npx playwright test
-        timeout-minutes: 15
-
       # ---------------------------------------------------------------------
-      # Production-config smoke (cheap, no browser). The gate above runs the
-      # widest payment allowlist; this boots the cash-only PRODUCTION shape on
-      # the same `next start` server Vercel runs, and doubles as the
+      # Production-config smoke (cheap, no browser). The gate above the build
+      # ran the widest payment allowlist; this boots the cash-only PRODUCTION
+      # shape on the same `next start` server Vercel runs, and doubles as the
       # documented post-deploy smoke (docs/RUNBOOK.md). No Playwright => no
-      # second e2e run (~10s). Runs after the build so `.next/` exists.
+      # second e2e run (~10s).
+      #
+      # MUST run on the pristine build, i.e. HERE, before the Playwright step:
+      # `npm run dev` (the e2e webServer) rewrites `.next` with a dev-shaped
+      # routes-manifest.json lacking `dataRoutes`, after which `next start`
+      # crashes with "[TypeError: routesManifest.dataRoutes is not iterable]"
+      # and never binds :3100. That was the bug: the first unguarded probe then
+      # died with `curl` exit 7 and NO diagnostics (the log was only cat-ed in
+      # the /admin branch, never reached).
       # ---------------------------------------------------------------------
       - name: Production-config smoke (COD_CASH, prod server)
         env:
           DEMO_MODE: "false"
           PAYMENT_METHODS: "COD_CASH"
           TZ: Africa/Kigali
+          # PORT + explicit -p: the prod server can never fall back to :3000.
+          PORT: "3100"
         run: |
           set -euo pipefail
-          npm run start -- -p 3100 >/tmp/zubeli-prod-smoke.log 2>&1 &
+          LOG=/tmp/zubeli-prod-smoke.log
+          npx next start -p 3100 >"$LOG" 2>&1 &
           SERVER_PID=$!
-          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
 
+          # Dump the server log on ANY failure so the real error reaches the
+          # CI annotations (previously the log was only shown for a bad /admin
+          # code, so a server crash surfaced as an opaque `curl` exit 7).
+          dump_log() {
+            echo "::error::production-config smoke failed — server log ($LOG):"
+            cat "$LOG" || true
+          }
+          trap 'rc=$?; if [ "$rc" -ne 0 ]; then dump_log; fi; kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          # Deterministic readiness gate: fail loudly if :3100 never opens.
           echo "Waiting for http://localhost:3100/api/health ..."
+          READY=""
           for _ in $(seq 1 30); do
-            if curl -fsS http://localhost:3100/api/health >/dev/null 2>&1; then
-              break
+            if curl -fsS http://localhost:3100/api/health >/dev/null 2>&1; then READY=1; break; fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "::error::next start exited before becoming ready"
+              exit 1
             fi
             sleep 1
           done
+          if [ -z "$READY" ]; then
+            echo "::error::server did not become ready on :3100 within 30s"
+            exit 1
+          fi
 
           echo "health: $(curl -fsS http://localhost:3100/api/health)"
           curl -fsS -o /dev/null -w "GET /          -> %{http_code}\n" http://localhost:3100/
@@ -237,13 +272,20 @@ jobs:
           echo "GET /admin      -> $ADMIN_CODE (guest expects 307)"
           if [ "$ADMIN_CODE" != "307" ]; then
             echo "::error::guest /admin returned $ADMIN_CODE, expected 307"
-            cat /tmp/zubeli-prod-smoke.log
             exit 1
           fi
 
+      # global-setup resets + reseeds the test DB once, then the 11 specs /
+      # 31 tests run serial (workers: 1 by design — shared seeded fixture).
+      # MUST NOT overlap the Vitest step: actions.test.ts TRUNCATEs the same
+      # shared test DB. This job is linear for exactly that reason.
+      - name: E2E (Playwright vs fresh test DB)
+        run: npx playwright test
+        timeout-minutes: 15
+
       - name: Upload Playwright report (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: playwright-report/
@@ -252,7 +294,7 @@ jobs:
 
       - name: Upload Playwright traces (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results
           path: test-results/
